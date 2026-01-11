@@ -22,7 +22,7 @@
   - `Server-Timing` / `X-Response-Time` 响应耗时
   - Prometheus 指标 `GET /metrics`
   - 可选 JSON 日志（`LOG_FORMAT=json`）
-- **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`）
+- **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`，支持 `q` 过滤）
 - **质量保障**：内置 `pytest` 单元测试 + `ruff` 静态检查
 - **Web 控制台**：访问 `GET /app`（无框架、轻量、性能友好）
 - **管理员能力**：用户管理（列表 / 创建 / 重置密码）与审计查询（需要管理员权限）
@@ -133,8 +133,8 @@ alembic stamp head
 - `GET /api/accounts` 获取当前用户账号列表（需要 Token，支持 `page` / `per_page` / `q` / `used`）
 - `PUT /api/account/<id>/status` 更新账号使用状态（需要 Token）
 - `PUT /api/account/<id>/delete` 删除账号（需要 Token）
-- `GET /api/audit/logs` 获取当前用户审计日志（需要 Token）
-- `GET /api/admin/audit/logs` 管理员审计日志（需要管理员 Token）
+- `GET /api/audit/logs` 获取当前用户审计日志（需要 Token，支持 `page` / `per_page` / `q`）
+- `GET /api/admin/audit/logs` 管理员审计日志（需要管理员 Token，支持 `user_id` / `q`）
 - `GET /api/health` 健康检查
 - `GET /metrics` Prometheus 指标
 - `GET /docs` API 文档页
@@ -157,7 +157,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **Account pool workflow**: import accounts, then “checkout” an unused one (checkout marks it as used)
 - **Listing UX**: `/api/accounts` supports `page` / `per_page` / `q` / `used` for pagination and filtering
 - **Observability**: `X-Request-ID`, `Server-Timing`/`X-Response-Time`, Prometheus metrics at `GET /metrics`, optional JSON logs
-- **Audit logs**: query at `GET /api/audit/logs`
+- **Audit logs**: query at `GET /api/audit/logs` (supports `q` filtering)
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
 - **Optional rate limiting**: `RATE_LIMIT_ENABLED`
 - **Admin access control**: `ADMIN_USERNAME` / `ADMIN_USER_IDS`

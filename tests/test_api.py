@@ -147,6 +147,28 @@ def test_admin_audit_logs_can_filter_by_user_id(client):
     assert all(item["user_id"] == bob_id for item in filtered.json["logs"])
 
 
+def test_audit_logs_support_query_filter(client):
+    reg = _register(client, username="qlog", password="p@ss", email="qlog@example.com")
+    token = reg.json["token"]
+
+    imported = client.post(
+        "/api/account",
+        headers=_auth_headers(token),
+        json={"email": "acc-qlog@example.com", "password": "accpass", "expire_days": 1},
+    )
+    assert imported.status_code == 201
+
+    filtered = client.get(
+        "/api/audit/logs?q=account.import&per_page=50",
+        headers=_auth_headers(token),
+    )
+    assert filtered.status_code == 200
+    assert filtered.json["status"] == "success"
+    actions = {item["action"] for item in filtered.json["logs"]}
+    assert "account.import" in actions
+    assert "user.register" not in actions
+
+
 def test_import_and_checkout_account_flow(client):
     reg = _register(client, username="bob", password="p@ss", email="bob@example.com")
     token = reg.json["token"]

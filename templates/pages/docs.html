@@ -70,7 +70,7 @@
             <tr>
               <td><span class="pill">GET</span></td>
               <td><code>/api/admin/audit/logs</code></td>
-              <td>管理员审计日志（支持 <code>user_id</code> 过滤）</td>
+              <td>管理员审计日志（支持 <code>user_id</code>/<code>q</code> 过滤）</td>
             </tr>
             <tr>
               <td><span class="pill pill--ok">POST</span></td>
@@ -100,7 +100,7 @@
             <tr>
               <td><span class="pill">GET</span></td>
               <td><code>/api/audit/logs</code></td>
-              <td>审计日志（需要 Token）</td>
+              <td>审计日志（需要 Token，支持 <code>page</code>/<code>per_page</code>/<code>q</code>）</td>
             </tr>
           </tbody>
         </table>

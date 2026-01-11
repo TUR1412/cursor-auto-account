@@ -14,6 +14,12 @@ const accountsState = {
   query: "",
 };
 
+const logsState = {
+  page: 1,
+  perPage: 20,
+  query: "",
+};
+
 const usersState = {
   page: 1,
   perPage: 10,
@@ -412,13 +418,43 @@ async function refreshAdminLogs() {
 }
 
 async function refreshLogs() {
-  const data = await api("/api/audit/logs?per_page=10");
-  renderLogs(data.logs || []);
+  const params = new URLSearchParams();
+  params.set("page", String(logsState.page));
+  params.set("per_page", String(logsState.perPage));
+  if (logsState.query) params.set("q", logsState.query);
+
+  const data = await api(`/api/audit/logs?${params.toString()}`);
+  const logs = data.logs || [];
+
+  // If the current page becomes empty, step back one page and retry once.
+  if (logs.length === 0 && Number(data.page) > 1) {
+    logsState.page = Number(data.page) - 1;
+    return refreshLogs();
+  }
+
+  const total = Number(data.total ?? logs.length);
+  const page = Number(data.page ?? logsState.page);
+  const totalPages = Number(data.total_pages ?? 1) || 1;
+
+  const meta = $("logsMeta");
+  if (meta) meta.textContent = `共 ${total} 条 · 每页 ${logsState.perPage} 条`;
+
+  const pager = $("logsPager");
+  if (pager) pager.textContent = `第 ${page}/${totalPages} 页`;
+
+  const prev = $("btnLogsPrev");
+  if (prev) prev.disabled = page <= 1;
+
+  const next = $("btnLogsNext");
+  if (next) next.disabled = page >= totalPages;
+
+  renderLogs(logs);
 }
 
 async function bootstrap() {
   const isAppPage = Boolean($("loginForm") && $("appCard"));
   const perPageSelect = $("accountsPerPage");
+  const logsPerPageSelect = $("logsPerPage");
   const usersPerPageSelect = $("usersPerPage");
   const adminLogsPerPageSelect = $("adminLogsPerPage");
 
@@ -445,6 +481,10 @@ async function bootstrap() {
     accountsState.perPage = Number(perPageSelect.value || 10) || 10;
   }
 
+  if (isAppPage && logsPerPageSelect) {
+    logsState.perPage = Number(logsPerPageSelect.value || 20) || 20;
+  }
+
   if (isAppPage && usersPerPageSelect) {
     usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;
   }
@@ -464,6 +504,24 @@ async function bootstrap() {
           accountsState.query = queryInput.value.trim();
           accountsState.page = 1;
           await refreshAccounts();
+        } catch (err) {
+          showNotice(err.message || "搜索失败", "error");
+        }
+      }, 250);
+    });
+  }
+
+  let logsQueryTimer = null;
+  const logsQueryInput = $("logsQuery");
+  if (logsQueryInput) {
+    logsQueryInput.addEventListener("input", () => {
+      if (logsQueryTimer) window.clearTimeout(logsQueryTimer);
+      logsQueryTimer = window.setTimeout(async () => {
+        try {
+          hideNotice();
+          logsState.query = logsQueryInput.value.trim();
+          logsState.page = 1;
+          await refreshLogs();
         } catch (err) {
           showNotice(err.message || "搜索失败", "error");
         }
@@ -520,6 +578,19 @@ async function bootstrap() {
     });
   }
 
+  if (logsPerPageSelect) {
+    logsPerPageSelect.addEventListener("change", async () => {
+      try {
+        hideNotice();
+        logsState.perPage = Number(logsPerPageSelect.value || 20) || 20;
+        logsState.page = 1;
+        await refreshLogs();
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
   if (usersPerPageSelect) {
     usersPerPageSelect.addEventListener("change", async () => {
       try {
@@ -559,6 +630,19 @@ async function bootstrap() {
     });
   }
 
+  const btnLogsPrev = $("btnLogsPrev");
+  if (btnLogsPrev) {
+    btnLogsPrev.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        logsState.page = Math.max(1, logsState.page - 1);
+        await refreshLogs();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
   const btnUsersPrev = $("btnUsersPrev");
   if (btnUsersPrev) {
     btnUsersPrev.addEventListener("click", async () => {
@@ -592,6 +676,19 @@ async function bootstrap() {
         hideNotice();
         accountsState.page += 1;
         await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
+  const btnLogsNext = $("btnLogsNext");
+  if (btnLogsNext) {
+    btnLogsNext.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        logsState.page += 1;
+        await refreshLogs();
       } catch (err) {
         showNotice(err.message || "翻页失败", "error");
       }

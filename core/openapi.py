@@ -278,13 +278,14 @@ def build_openapi_spec() -> dict:
                         {
                             "name": "page",
                             "in": "query",
-                            "schema": {"type": "integer", "default": 1},
+                            "schema": {"type": "integer", "default": 1},        
                         },
                         {
                             "name": "per_page",
                             "in": "query",
-                            "schema": {"type": "integer", "default": 10},
+                            "schema": {"type": "integer", "default": 20},       
                         },
+                        {"name": "q", "in": "query", "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -392,13 +393,19 @@ def build_openapi_spec() -> dict:
                         {
                             "name": "page",
                             "in": "query",
-                            "schema": {"type": "integer", "default": 1},
+                            "schema": {"type": "integer", "default": 1},        
                         },
                         {
                             "name": "per_page",
                             "in": "query",
-                            "schema": {"type": "integer", "default": 10},
+                            "schema": {"type": "integer", "default": 20},       
                         },
+                        {
+                            "name": "user_id",
+                            "in": "query",
+                            "schema": {"type": "integer"},
+                        },
+                        {"name": "q", "in": "query", "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }

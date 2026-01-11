@@ -680,48 +680,90 @@ def update_user(user_id):
 @api_bp.route("/audit/logs", methods=["GET"])
 @token_required
 def get_audit_logs():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    try:
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 20, type=int)
+        query_text = (request.args.get("q") or "").strip()
 
-    query = AuditLog.query.filter_by(user_id=request.current_user.id).order_by(
-        AuditLog.created_at.desc()
-    )
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        page = max(page, 1)
+        per_page = max(min(per_page, 100), 1)
 
-    return jsonify(
-        {
-            "status": "success",
-            "page": page,
-            "per_page": per_page,
-            "total": pagination.total,
-            "total_pages": pagination.pages,
-            "logs": [log.to_dict() for log in pagination.items],
-        }
-    )
+        query = AuditLog.query.filter_by(user_id=request.current_user.id)
+        if query_text:
+            query = query.filter(
+                or_(
+                    AuditLog.action.contains(query_text),
+                    AuditLog.request_id.contains(query_text),
+                    AuditLog.entity_type.contains(query_text),
+                    AuditLog.detail.contains(query_text),
+                    AuditLog.ip.contains(query_text),
+                    AuditLog.user_agent.contains(query_text),
+                )
+            )
+
+        query = query.order_by(AuditLog.created_at.desc())
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        return jsonify(
+            {
+                "status": "success",
+                "page": page,
+                "per_page": per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages,
+                "logs": [log.to_dict() for log in pagination.items],
+            }
+        )
+    except Exception:
+        logger.error(f"获取审计日志失败: {traceback.format_exc()}")
+        return jsonify({"status": "error", "message": "获取审计日志失败，请稍后再试"}), 500
 
 
 # 管理员获取审计日志
 @api_bp.route("/admin/audit/logs", methods=["GET"])
 @admin_required
 def admin_get_audit_logs():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
-    user_id = request.args.get("user_id", None, type=int)
+    try:
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 20, type=int)
+        user_id = request.args.get("user_id", None, type=int)
+        query_text = (request.args.get("q") or "").strip()
 
-    query = AuditLog.query
-    if user_id is not None:
-        query = query.filter_by(user_id=user_id)
+        page = max(page, 1)
+        per_page = max(min(per_page, 100), 1)
 
-    query = query.order_by(AuditLog.created_at.desc())
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        query = AuditLog.query
+        if user_id is not None:
+            query = query.filter_by(user_id=user_id)
 
-    return jsonify(
-        {
-            "status": "success",
-            "page": page,
-            "per_page": per_page,
-            "total": pagination.total,
-            "total_pages": pagination.pages,
-            "logs": [log.to_dict() for log in pagination.items],
-        }
-    )
+        if query_text:
+            query = query.filter(
+                or_(
+                    AuditLog.action.contains(query_text),
+                    AuditLog.request_id.contains(query_text),
+                    AuditLog.entity_type.contains(query_text),
+                    AuditLog.detail.contains(query_text),
+                    AuditLog.ip.contains(query_text),
+                    AuditLog.user_agent.contains(query_text),
+                )
+            )
+
+        query = query.order_by(AuditLog.created_at.desc())
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        return jsonify(
+            {
+                "status": "success",
+                "page": page,
+                "per_page": per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages,
+                "logs": [log.to_dict() for log in pagination.items],
+            }
+        )
+    except Exception:
+        logger.error(f"管理员获取审计日志失败: {traceback.format_exc()}")
+        return (
+            jsonify({"status": "error", "message": "获取审计日志失败，请稍后再试"}),
+            500,
+        )
