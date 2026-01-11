@@ -14,6 +14,12 @@ const accountsState = {
   query: "",
 };
 
+const usersState = {
+  page: 1,
+  perPage: 10,
+  query: "",
+};
+
 function getToken() {
   return localStorage.getItem(storageKey) || "";
 }
@@ -29,6 +35,16 @@ function clearToken() {
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function escapeHtml(value) {
+  const s = String(value ?? "");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function showNotice(message, variant = "success") {
@@ -104,6 +120,12 @@ async function api(path, options = {}) {
   return data;
 }
 
+function setAdminUI(user) {
+  const adminCard = $("adminCard");
+  if (!adminCard) return;
+  adminCard.hidden = !(user && user.is_admin);
+}
+
 function setAuthedUI(user) {
   const authCard = $("authCard");
   const appCard = $("appCard");
@@ -113,7 +135,11 @@ function setAuthedUI(user) {
   if (authCard) authCard.hidden = true;
   if (appCard) appCard.hidden = false;
   if (btnLogout) btnLogout.hidden = false;
-  if (navUser) navUser.textContent = `已登录：${user.username}（ID ${user.id}）`;
+  if (navUser) {
+    const adminBadge = user?.is_admin ? " · Admin" : "";
+    navUser.textContent = `已登录：${user.username}（ID ${user.id}）${adminBadge}`;
+  }
+  setAdminUI(user);
 }
 
 function setGuestUI() {
@@ -126,6 +152,7 @@ function setGuestUI() {
   if (appCard) appCard.hidden = true;
   if (btnLogout) btnLogout.hidden = true;
   if (navUser) navUser.textContent = "未登录";
+  setAdminUI(null);
 }
 
 function fmtExpire(account) {
@@ -149,7 +176,7 @@ function renderAccounts(accounts) {
 
     tr.innerHTML = `
       <td>${acc.id}</td>
-      <td><code>${acc.email}</code></td>
+      <td><code>${escapeHtml(acc.email)}</code></td>
       <td><span class="${usedPill}">${usedText}</span></td>
       <td>${fmtExpire(acc)}</td>
       <td>
@@ -220,9 +247,27 @@ function renderLogs(logs) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${fmtTime(log.created_at)}</td>
-      <td><code>${log.action}</code></td>
-      <td>${entity}</td>
-      <td><code>${detailText}</code></td>
+      <td><code>${escapeHtml(log.action)}</code></td>
+      <td>${escapeHtml(entity)}</td>
+      <td><code>${escapeHtml(detailText)}</code></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderUsers(users) {
+  const tbody = $("usersTable").querySelector("tbody");
+  tbody.innerHTML = "";
+
+  for (const user of users) {
+    const tr = document.createElement("tr");
+    const email = user.email ? String(user.email) : "";
+    tr.innerHTML = `
+      <td>${user.id}</td>
+      <td><code>${escapeHtml(user.username)}</code></td>
+      <td><code>${escapeHtml(email)}</code></td>
+      <td>${fmtTime(user.created_at)}</td>
+      <td>${fmtTime(user.last_login)}</td>
     `;
     tbody.appendChild(tr);
   }
@@ -263,6 +308,41 @@ async function refreshAccounts() {
   renderAccounts(accounts);
 }
 
+async function refreshUsers() {
+  const params = new URLSearchParams();
+  params.set("page", String(usersState.page));
+  params.set("per_page", String(usersState.perPage));
+  if (usersState.query) params.set("q", usersState.query);
+
+  const data = await api(`/api/admin/users?${params.toString()}`);
+  const users = data.users || [];
+
+  // If the current page becomes empty (e.g. after deletions), step back one
+  // page and retry once.
+  if (users.length === 0 && Number(data.page) > 1) {
+    usersState.page = Number(data.page) - 1;
+    return refreshUsers();
+  }
+
+  const total = Number(data.total ?? users.length);
+  const page = Number(data.page ?? usersState.page);
+  const totalPages = Number(data.total_pages ?? 1) || 1;
+
+  const meta = $("usersMeta");
+  if (meta) meta.textContent = `共 ${total} 条 · 每页 ${usersState.perPage} 条`;
+
+  const pager = $("usersPager");
+  if (pager) pager.textContent = `第 ${page}/${totalPages} 页`;
+
+  const prev = $("btnUsersPrev");
+  if (prev) prev.disabled = page <= 1;
+
+  const next = $("btnUsersNext");
+  if (next) next.disabled = page >= totalPages;
+
+  renderUsers(users);
+}
+
 async function refreshLogs() {
   const data = await api("/api/audit/logs?per_page=10");
   renderLogs(data.logs || []);
@@ -271,6 +351,7 @@ async function refreshLogs() {
 async function bootstrap() {
   const isAppPage = Boolean($("loginForm") && $("appCard"));
   const perPageSelect = $("accountsPerPage");
+  const usersPerPageSelect = $("usersPerPage");
 
   // Global navbar actions (available on all pages)
   const btnLogout = $("btnLogout");
@@ -295,6 +376,10 @@ async function bootstrap() {
     accountsState.perPage = Number(perPageSelect.value || 10) || 10;
   }
 
+  if (isAppPage && usersPerPageSelect) {
+    usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;
+  }
+
   let queryTimer = null;
   const queryInput = $("accountsQuery");
   if (queryInput) {
@@ -313,13 +398,44 @@ async function bootstrap() {
     });
   }
 
+  let usersQueryTimer = null;
+  const usersQueryInput = $("usersQuery");
+  if (usersQueryInput) {
+    usersQueryInput.addEventListener("input", () => {
+      if (usersQueryTimer) window.clearTimeout(usersQueryTimer);
+      usersQueryTimer = window.setTimeout(async () => {
+        try {
+          hideNotice();
+          usersState.query = usersQueryInput.value.trim();
+          usersState.page = 1;
+          await refreshUsers();
+        } catch (err) {
+          showNotice(err.message || "搜索失败", "error");
+        }
+      }, 250);
+    });
+  }
+
   if (perPageSelect) {
     perPageSelect.addEventListener("change", async () => {
       try {
         hideNotice();
-        accountsState.perPage = Number(perPageSelect.value || 10) || 10;
+        accountsState.perPage = Number(perPageSelect.value || 10) || 10;        
         accountsState.page = 1;
         await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
+  if (usersPerPageSelect) {
+    usersPerPageSelect.addEventListener("change", async () => {
+      try {
+        hideNotice();
+        usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;
+        usersState.page = 1;
+        await refreshUsers();
       } catch (err) {
         showNotice(err.message || "刷新失败", "error");
       }
@@ -339,6 +455,19 @@ async function bootstrap() {
     });
   }
 
+  const btnUsersPrev = $("btnUsersPrev");
+  if (btnUsersPrev) {
+    btnUsersPrev.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        usersState.page = Math.max(1, usersState.page - 1);
+        await refreshUsers();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
   const btnNext = $("btnNextPage");
   if (btnNext) {
     btnNext.addEventListener("click", async () => {
@@ -346,6 +475,19 @@ async function bootstrap() {
         hideNotice();
         accountsState.page += 1;
         await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
+  const btnUsersNext = $("btnUsersNext");
+  if (btnUsersNext) {
+    btnUsersNext.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        usersState.page += 1;
+        await refreshUsers();
       } catch (err) {
         showNotice(err.message || "翻页失败", "error");
       }
@@ -366,6 +508,53 @@ async function bootstrap() {
   }
 
   if (isAppPage) {
+    const adminCreateUserForm = $("adminCreateUserForm");
+    if (adminCreateUserForm) {
+      adminCreateUserForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          hideNotice();
+          const username = $("adminNewUsername").value.trim();
+          const email = $("adminNewEmail").value.trim();
+          const password = $("adminNewPassword").value;
+          await api("/api/admin/users", {
+            method: "POST",
+            body: JSON.stringify({ username, password, email: email || undefined }),
+          });
+          $("adminNewPassword").value = "";
+          usersState.page = 1;
+          await refreshUsers();
+          await refreshLogs();
+          showNotice("用户已创建", "success");
+        } catch (err) {
+          showNotice(err.message || "创建失败", "error");
+        }
+      });
+    }
+
+    const adminResetPasswordForm = $("adminResetPasswordForm");
+    if (adminResetPasswordForm) {
+      adminResetPasswordForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          hideNotice();
+          const userId = Number($("adminResetUserId").value);
+          const password = $("adminResetPassword").value;
+          if (!userId) throw new Error("请填写正确的用户ID");
+          await api(`/api/admin/users/${userId}/password`, {
+            method: "PUT",
+            body: JSON.stringify({ password }),
+          });
+          $("adminResetPassword").value = "";
+          await refreshUsers();
+          await refreshLogs();
+          showNotice("密码已重置", "success");
+        } catch (err) {
+          showNotice(err.message || "重置失败", "error");
+        }
+      });
+    }
+
     $("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -381,6 +570,10 @@ async function bootstrap() {
         setAuthedUI(me.user);
         await refreshAccounts();
         await refreshLogs();
+        if (me.user && me.user.is_admin) {
+          usersState.page = 1;
+          await refreshUsers();
+        }
         showNotice("登录成功", "success");
       } catch (err) {
         showNotice(err.message || "登录失败", "error");
@@ -403,6 +596,10 @@ async function bootstrap() {
         setAuthedUI(me.user);
         await refreshAccounts();
         await refreshLogs();
+        if (me.user && me.user.is_admin) {
+          usersState.page = 1;
+          await refreshUsers();
+        }
         showNotice("注册成功", "success");
       } catch (err) {
         showNotice(err.message || "注册失败", "error");
@@ -466,6 +663,10 @@ async function bootstrap() {
     if (isAppPage) {
       await refreshAccounts();
       await refreshLogs();
+      if (me.user && me.user.is_admin) {
+        usersState.page = 1;
+        await refreshUsers();
+      }
     }
   } catch {
     clearToken();

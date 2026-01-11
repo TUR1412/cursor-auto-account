@@ -336,6 +336,7 @@ def build_openapi_spec() -> dict:
                             "in": "query",
                             "schema": {"type": "integer", "default": 10},
                         },
+                        {"name": "q", "in": "query", "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "OK"}},
                 },
@@ -362,6 +363,27 @@ def build_openapi_spec() -> dict:
                         "409": {"description": "Conflict"},
                     },
                 },
+            },
+            "/api/admin/users/{id}/password": {
+                "put": {
+                    "summary": "Admin reset user password",
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"password": {"type": "string"}},
+                                    "required": ["password"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
             },
             "/api/admin/audit/logs": {
                 "get": {

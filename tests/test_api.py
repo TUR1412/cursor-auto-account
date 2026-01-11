@@ -71,6 +71,62 @@ def test_admin_can_create_user(client):
     assert login.status_code == 200
 
 
+def test_admin_get_users_supports_query_filter(client):
+    admin_reg = _register(client, username="superadmin", password="p@ss", email="sa@example.com")
+    token = admin_reg.json["token"]
+
+    created_1 = client.post(
+        "/api/admin/users",
+        headers=_auth_headers(token),
+        json={"username": "alice-filter", "password": "p1", "email": "alice@example.com"},
+    )
+    assert created_1.status_code == 201
+
+    created_2 = client.post(
+        "/api/admin/users",
+        headers=_auth_headers(token),
+        json={"username": "bob-filter", "password": "p2", "email": "bob@example.com"},
+    )
+    assert created_2.status_code == 201
+
+    filtered = client.get("/api/admin/users?q=alice&per_page=100", headers=_auth_headers(token))
+    assert filtered.status_code == 200
+    assert filtered.json["status"] == "success"
+    usernames = {u["username"] for u in filtered.json["users"]}
+    assert "alice-filter" in usernames
+    assert "bob-filter" not in usernames
+
+
+def test_admin_can_reset_user_password(client):
+    admin_reg = _register(client, username="superadmin", password="p@ss", email="sa@example.com")
+    token = admin_reg.json["token"]
+
+    created = client.post(
+        "/api/admin/users",
+        headers=_auth_headers(token),
+        json={"username": "target-user", "password": "old-pass", "email": "t@example.com"},
+    )
+    assert created.status_code == 201
+    user_id = created.json["user"]["id"]
+
+    ok_old = _login(client, username="target-user", password="old-pass")
+    assert ok_old.status_code == 200
+
+    reset = client.put(
+        f"/api/admin/users/{user_id}/password",
+        headers=_auth_headers(token),
+        json={"password": "new-pass"},
+    )
+    assert reset.status_code == 200
+    assert reset.json["status"] == "success"
+
+    blocked_old = _login(client, username="target-user", password="old-pass")
+    assert blocked_old.status_code == 401
+
+    ok_new = _login(client, username="target-user", password="new-pass")
+    assert ok_new.status_code == 200
+
+
 def test_import_and_checkout_account_flow(client):
     reg = _register(client, username="bob", password="p@ss", email="bob@example.com")
     token = reg.json["token"]

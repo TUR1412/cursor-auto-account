@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import wraps
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlalchemy.exc import IntegrityError
 
 from account_service import create_account_for_user
@@ -449,9 +449,16 @@ def admin_get_users():
     try:
         page = request.args.get("page", 1, type=int)
         per_page = request.args.get("per_page", 10, type=int)
+        query_text = (request.args.get("q") or "").strip()
+
+        page = max(page, 1)
+        per_page = max(min(per_page, 100), 1)
 
         # 查询用户 倒序排列
-        query = User.query.order_by(User.id.desc())
+        query = User.query
+        if query_text:
+            query = query.filter(or_(User.username.contains(query_text), User.email.contains(query_text)))
+        query = query.order_by(User.id.desc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
         users = [user.to_dict() for user in pagination.items]
@@ -517,6 +524,36 @@ def admin_create_user():
         db.session.rollback()
         logger.error(f"管理员创建用户失败: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": "创建用户失败，请稍后再试"}), 500
+
+
+@api_bp.route("/admin/users/<int:user_id>/password", methods=["PUT"])
+@admin_required
+def admin_reset_user_password(user_id: int):
+    try:
+        data = request.json or {}
+        new_password = data.get("password")
+        if not new_password:
+            return jsonify({"status": "error", "message": "缺少必要参数: password"}), 400
+
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({"status": "error", "message": "用户不存在"}), 404
+
+        user.password_hash = User.hash_password(new_password)
+
+        record_audit(
+            action="admin.user.reset_password",
+            user=request.current_user,
+            entity_type="user",
+            entity_id=user.id,
+            detail={"username": user.username},
+        )
+        db.session.commit()
+        return jsonify({"status": "success", "message": "密码已重置", "user": user.to_dict()}), 200
+    except Exception:
+        db.session.rollback()
+        logger.error(f"管理员重置用户密码失败: {traceback.format_exc()}")
+        return jsonify({"status": "error", "message": "重置密码失败，请稍后再试"}), 500
 
 
 # 逻辑删除账号

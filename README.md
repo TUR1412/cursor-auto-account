@@ -24,7 +24,8 @@
 - **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`）
 - **质量保障**：内置 `pytest` 单元测试 + `ruff` 静态检查
 - **Web 控制台**：访问 `GET /app`（无框架、轻量、性能友好）
-- **安全增强**：`POST /api/logout` 会撤销当前 Token（基于 `jti` 黑名单）
+- **管理员能力**：用户管理（列表 / 创建 / 重置密码）与审计查询（需要管理员权限）
+- **安全增强**：`POST /api/logout` 会撤销当前 Token（基于 `jti` 黑名单）        
 
 ### 快速开始（Docker Compose）
 
@@ -122,7 +123,9 @@ alembic stamp head
 - `POST /api/login` 登录
 - `GET /api/user` 获取当前用户信息（需要 Token）
 - `POST /api/logout` 退出登录（撤销当前 Token）
-- `POST /api/admin/users` 管理员创建用户（建议生产环境关闭自助注册后使用）
+- `POST /api/admin/users` 管理员创建用户（建议生产环境关闭自助注册后使用）      
+- `GET /api/admin/users` 管理员用户列表（支持 `page` / `per_page` / `q`）
+- `PUT /api/admin/users/<id>/password` 管理员重置用户密码
 - `POST /api/account` 导入账号（需要 Token）
 - `GET /api/account` 发放一个未使用账号（需要 Token）
 - `GET /api/account/<id>` 获取单个账号详情（需要 Token）
@@ -157,6 +160,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
 - **Optional rate limiting**: `RATE_LIMIT_ENABLED`
 - **Admin access control**: `ADMIN_USERNAME` / `ADMIN_USER_IDS`
+- **Admin user management**: list/create/reset passwords via `/api/admin/users` (admin-only)
 - **Logout revokes tokens**: `POST /api/logout` invalidates the current token (jti blacklist)
 - **Quality gates**: built-in `pytest` tests and `ruff` lint checks
 - **Web console**: `GET /app` (no framework, fast, Lighthouse-friendly)

@@ -36,6 +36,7 @@ class User(db.Model):
             "last_login": self.last_login,
             "domain": self.domain,
             "temp_email_address": self.temp_email_address,
+            "is_admin": self.is_admin,
         }
 
     @staticmethod
