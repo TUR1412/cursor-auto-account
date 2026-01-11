@@ -1,8 +1,9 @@
-import time
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
+
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
@@ -35,12 +36,25 @@ class User(db.Model):
 
     @staticmethod
     def hash_password(password):
+        # 使用Werkzeug提供的安全哈希（兼容Flask生态）
+        return generate_password_hash(password)
+
+    @staticmethod
+    def _legacy_hash_password(password: str) -> str:
         import hashlib
-        # 简单哈希密码，生产环境应使用更安全的方法如bcrypt
+
         return hashlib.sha256(password.encode()).hexdigest()
 
     def verify_password(self, password):
-        return self.password_hash == User.hash_password(password)
+        # 兼容旧数据：历史版本使用sha256明文哈希
+        if self.password_hash and ("$" in self.password_hash or ":" in self.password_hash):
+            return check_password_hash(self.password_hash, password)
+        return self.password_hash == User._legacy_hash_password(password)
+
+    @property
+    def is_admin(self) -> bool:
+        # 兼容项目当前实现：简单地以ID=1作为管理员
+        return self.id == 1
 
 # 定义账号模型
 class Account(db.Model):
@@ -74,10 +88,6 @@ class Account(db.Model):
             'expire_time_fmt': datetime.fromtimestamp(self.expire_time).strftime('%Y-%m-%d %H:%M:%S')
         }
 
-        # 安全地添加user_id，如果有这个属性
-        try:
-            data['user_id'] = self.user_id
-        except:
-            data['user_id'] = None
+        data["user_id"] = self.user_id
 
         return data

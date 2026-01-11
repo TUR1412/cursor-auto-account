@@ -1,0 +1,97 @@
+{% extends "layouts/base.html" %}
+{% from "components/atoms/button.html" import button %}
+{% from "components/molecules/form_field.html" import form_field %}
+
+{% block title %}账号管理控制台{% endblock %}
+
+{% block content %}
+  <section class="grid">
+    <div class="card">
+      <h1 class="h1">账号管理控制台</h1>
+      <p class="muted">
+        本界面仅用于管理你已合法拥有的账号数据（导入 / 列表 / 发放 / 标记 / 删除）。
+        系统不会自动注册任何第三方账号，也不包含验证码/风控绕过逻辑。
+      </p>
+      <div class="notice" id="notice" hidden></div>
+    </div>
+
+    <div class="card" id="authCard">
+      <div class="card__header">
+        <h2 class="h2">登录 / 注册</h2>
+        <p class="muted">获取 Token 后即可使用所有 API 与页面功能。</p>
+      </div>
+
+      <div class="cols cols--2">
+        <form class="form" id="loginForm">
+          <h3 class="h3">登录</h3>
+          {{ form_field("用户名", "username", id="loginUsername", autocomplete="username", required=True) }}
+          {{ form_field("密码", "password", type="password", id="loginPassword", autocomplete="current-password", required=True) }}
+          <div class="row">
+            {{ button("登录", id="btnLogin", type="submit") }}
+          </div>
+        </form>
+
+        <form class="form" id="registerForm">
+          <h3 class="h3">注册</h3>
+          {{ form_field("用户名", "username", id="registerUsername", autocomplete="username", required=True) }}
+          {{ form_field("邮箱（可选）", "email", type="email", id="registerEmail", autocomplete="email") }}
+          {{ form_field("密码", "password", type="password", id="registerPassword", autocomplete="new-password", required=True) }}
+          <div class="row">
+            {{ button("注册", variant="secondary", id="btnRegister", type="submit") }}
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" id="appCard" hidden>
+      <div class="card__header">
+        <h2 class="h2">账号操作</h2>
+        <p class="muted">导入账号后，可一键“发放”一个未使用账号。</p>
+      </div>
+
+      <div class="cols cols--2">
+        <form class="form" id="importForm">
+          <h3 class="h3">导入账号</h3>
+          {{ form_field("Email", "email", id="importEmail", autocomplete="off", required=True) }}
+          {{ form_field("Password", "password", type="text", id="importPassword", autocomplete="off", required=True) }}
+          <div class="row">
+            {{ button("导入", id="btnImport", type="submit") }}
+          </div>
+        </form>
+
+        <div class="panel">
+          <h3 class="h3">发放账号</h3>
+          <p class="muted">从你的账号池中取 1 个未使用账号，并自动标记为已使用。</p>
+          <div class="row">
+            {{ button("获取一个账号", variant="primary", id="btnCheckout") }}
+            {{ button("刷新列表", variant="ghost", id="btnRefresh") }}
+          </div>
+          <pre class="code" id="checkoutResult" aria-live="polite"></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row row--between">
+        <h3 class="h3">我的账号列表</h3>
+        <span class="muted" id="accountsMeta"></span>
+      </div>
+
+      <div class="tableWrap" role="region" aria-label="账号列表" tabindex="0">
+        <table class="table" id="accountsTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Used</th>
+              <th>Expire</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+

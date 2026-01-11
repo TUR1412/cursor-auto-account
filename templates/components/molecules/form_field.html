@@ -1,0 +1,9 @@
+{% from "components/atoms/input.html" import input %}
+
+{% macro form_field(label, name, type="text", placeholder="", id=None, autocomplete=None, required=False) -%}
+<label class="field" {% if id %}for="{{ id }}"{% endif %}>
+  <span class="field__label">{{ label }}</span>
+  {{ input(name=name, type=type, placeholder=placeholder, id=id, autocomplete=autocomplete, required=required) }}
+</label>
+{%- endmacro %}
+

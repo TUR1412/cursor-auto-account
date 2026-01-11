@@ -1,0 +1,14 @@
+{% macro input(name, type="text", placeholder="", value="", id=None, autocomplete=None, required=False, attrs="") -%}
+<input
+  class="input"
+  name="{{ name }}"
+  {% if id %}id="{{ id }}"{% endif %}
+  type="{{ type }}"
+  placeholder="{{ placeholder }}"
+  value="{{ value }}"
+  {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+  {% if required %}required{% endif %}
+  {{ attrs|safe }}
+/>
+{%- endmacro %}
+

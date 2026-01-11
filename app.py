@@ -1,22 +1,26 @@
 import os
 import random
 import string
-from datetime import datetime
-from flask import Flask
+import urllib.parse
+
 from dotenv import load_dotenv
+from flask import Flask
+
+import auth
+from core.errors import register_error_handlers
+from core.logging_config import configure_logging
+from core.metrics import register_metrics
+from core.middleware import register_request_context
+from db_utils import init_db
+from models import db
+from views.api import api_bp
+from views.web import web_bp
 
 # 加载.env文件
 load_dotenv()
-
-# 导入自定义模块
-from models import db
-from auth import SECRET_KEY, TOKEN_EXPIRY_DAYS
-import auth
-from db_utils import init_db
-from views.api import api_bp
-import urllib.parse
 # 创建并配置 Flask 应用
 def create_app():
+    configure_logging()
     app = Flask(__name__)
 
     # 从环境变量获取数据库配置
@@ -27,9 +31,14 @@ def create_app():
     app.config['DB_NAME'] = os.getenv('DB_NAME', 'cursor_accounts')
 
     # 设置 SQLAlchemy 数据库 URI
-    # 对密码进行URL编码，避免特殊字符（如@）造成解析问题
-    encoded_password = urllib.parse.quote_plus(app.config["DB_PASSWORD"])
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{app.config["DB_USER"]}:{encoded_password}@{app.config["DB_HOST"]}:{app.config["DB_PORT"]}/{app.config["DB_NAME"]}'
+    # 优先使用 DATABASE_URL（便于本地/测试环境切换为sqlite）
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    else:
+        # 对密码进行URL编码，避免特殊字符（如@）造成解析问题
+        encoded_password = urllib.parse.quote_plus(app.config["DB_PASSWORD"])
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{app.config["DB_USER"]}:{encoded_password}@{app.config["DB_HOST"]}:{app.config["DB_PORT"]}/{app.config["DB_NAME"]}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # JWT密钥
@@ -46,6 +55,12 @@ def create_app():
 
     # 注册蓝图
     app.register_blueprint(api_bp)
+    app.register_blueprint(web_bp)
+
+    # 全局中间件 / 错误处理
+    register_request_context(app)
+    register_metrics(app)
+    register_error_handlers(app)
 
     return app
 

@@ -1,8 +1,12 @@
 import logging
 import os
 import time
-from sqlalchemy import text, create_engine
-from models import db, User
+import urllib.parse
+
+from sqlalchemy import create_engine, text
+
+from models import User, db
+
 
 # 创建数据库和表
 def init_db(app):
@@ -14,9 +18,12 @@ def init_db(app):
             DB_USER = app.config['DB_USER']
             DB_PASSWORD = app.config['DB_PASSWORD']
             DB_NAME = app.config['DB_NAME']
-            
+
             # 尝试创建数据库
-            engine = create_engine(f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/')
+            encoded_password = urllib.parse.quote_plus(DB_PASSWORD)
+            engine = create_engine(
+                f'mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/'
+            )
             with engine.connect() as conn:
                 conn.execute(text(f'CREATE DATABASE IF NOT EXISTS {DB_NAME}'))
                 conn.commit()
@@ -46,5 +53,7 @@ def init_db(app):
                 db.session.commit()
                 logging.info(f"更新管理员密码: {admin_username}")
                 
-        except Exception as e:
-            print(f"数据库初始化错误: {e}") 
+        except Exception:
+            db.session.rollback()
+            logging.exception("数据库初始化错误")
+            raise

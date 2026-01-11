@@ -1,61 +1,38 @@
-import time
-from sqlalchemy import text
-import register as account_register
-from models import db, Account
+from models import Account, db
 
-# 为用户创建账号
+
 def create_account_for_user(current_user):
+    """
+    为用户提供一个可用账号。
+
+    合规说明：本项目不再自动注册第三方账号，也不包含/不执行任何验证码或风控绕过流程。
+    该方法仅从数据库中“发放”用户已导入的账号（账号来源需由用户自行确保合法合规）。
+    """
+
     try:
-        # 生成随机名字和账号信息
-        email_generator = account_register.EmailGenerator(domain=current_user.domain)
-        account_info = email_generator.get_account_info()
-        
-        # 从返回的字典中获取信息
-        email = account_info["email"]
-        password = account_info["password"]
-        first_name = account_info["first_name"]
-        last_name = account_info["last_name"]
-        
-        # 检查邮箱是否已存在
-        existing_account = Account.query.filter_by(email=email).first()
-        if existing_account:
-            return {'status': 'error', 'message': '该邮箱已被使用，请重试'}
-        
-        if current_user.temp_email_address:
-            temp_email_address = current_user.temp_email_address
-        else:
-            temp_email_address = 'zoowayss@mailto.plus'
-        
-        # 注册账号
-        registration = account_register.Register(first_name, last_name, email, password,temp_email_address)
-        success = registration.register()
-        
-        if not success:
-            return {'status': 'error', 'message': '注册失败，请稍后再试'}
-        
-        # 计算过期时间 (15天后)
-        create_time = int(time.time())
-        expire_time = create_time + (15 * 24 * 60 * 60)
-        
-        # 创建账号对象
-        account = Account(
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            create_time=create_time,
-            expire_time=expire_time,
-            user_id=current_user.id,
-            is_used=0  # 标记为已使用
+        # 取一个未使用且未删除的账号
+        account = (
+            Account.query.filter_by(user_id=current_user.id, is_deleted=0, is_used=0)
+            .order_by(Account.create_time.desc())
+            .first()
         )
-        
-        db.session.add(account)
+        if not account:
+            return {
+                "status": "error",
+                "code": "NO_AVAILABLE_ACCOUNT",
+                "message": "没有可用账号，请先导入账号（POST /api/account）或联系管理员分配。",
+            }
+
+        # 发放即标记为已使用，避免重复发放
+        account.is_used = 1
         db.session.commit()
+
         return {
-            'status': 'success',
-            'message': '新账号已创建',
-            'account': account.to_dict()
+            "status": "success",
+            "message": "账号已发放",
+            "account": account.to_dict(),
         }
-    
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)} 
+
+    except Exception as exc:
+        db.session.rollback()
+        return {"status": "error", "code": "INTERNAL_ERROR", "message": str(exc)}

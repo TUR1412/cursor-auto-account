@@ -1,19 +1,21 @@
 import logging
+import threading
 import time
 import traceback
-import threading
 from functools import wraps
-from flask import Blueprint, jsonify, request, current_app
-from models import db, User, Account
-from auth import token_required, admin_required, generate_token
+
+from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import IntegrityError
+
 from account_service import create_account_for_user
+from auth import admin_required, generate_token, token_required
+from models import Account, User, db
 
 # 创建蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # 设置日志
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 # 创建一个信号量用于限制并发请求
 account_semaphore = threading.Semaphore(3)
@@ -84,9 +86,10 @@ def register():
             'token': token
         })
 
-    except Exception as e:
+    except Exception:
+        db.session.rollback()
         logger.error(f"注册失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '注册失败，请稍后再试'}), 500
 
 # 用户登录
 @api_bp.route('/login', methods=['POST'])
@@ -122,9 +125,9 @@ def login():
             'token': token
         })
 
-    except Exception as e:
+    except Exception:
         logger.error(f"登录失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '登录失败，请稍后再试'}), 500
 
 # 获取用户信息
 @api_bp.route('/user', methods=['GET'])
@@ -154,15 +157,67 @@ def get_account():
         logger.info(f"用户 {request.current_user.id} 请求获取账号")
         result = create_account_for_user(request.current_user)
         if result.get('status') == 'success':
-            return jsonify(result)
-        else:
-            return jsonify(result), 500
+            return jsonify(result), 200
+        if result.get("code") == "NO_AVAILABLE_ACCOUNT":
+            return jsonify(result), 404
+        return jsonify(result), 400
     except Exception as e:
         logger.error(f"获取账号失败: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': '获取账号失败，请稍后再试'
         }), 500
+
+# 导入账号（已登录用户）
+@api_bp.route('/account', methods=['POST'])
+@token_required
+def import_account():
+    try:
+        data = request.json or {}
+
+        email = (data.get("email") or "").strip()
+        password = data.get("password")
+        if not email or not password:
+            return jsonify({"status": "error", "message": "缺少必要参数: email/password"}), 400
+
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+
+        now = int(time.time())
+        expire_time = data.get("expire_time")
+        if expire_time is not None:
+            expire_time = int(expire_time)
+        else:
+            expire_days = int(data.get("expire_days", 15))
+            expire_time = now + (expire_days * 24 * 60 * 60)
+
+        account = Account(
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            create_time=now,
+            expire_time=expire_time,
+            is_used=int(data.get("is_used", 0)),
+            is_deleted=0,
+            user_id=request.current_user.id,
+        )
+
+        db.session.add(account)
+        db.session.commit()
+
+        return (
+            jsonify({"status": "success", "message": "账号已导入", "account": account.to_dict()}),
+            201,
+        )
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "该邮箱已存在，无法重复导入"}), 409
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"导入账号失败: {traceback.format_exc()}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # 获取用户的所有账号
 @api_bp.route('/accounts', methods=['GET'])
@@ -188,9 +243,9 @@ def get_user_accounts():
             'accounts': accounts
         })
 
-    except Exception as e:
+    except Exception:
         logger.error(f"获取用户账号失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '获取账号列表失败，请稍后再试'}), 500
 
 # 修改账号使用状态
 @api_bp.route('/account/<int:account_id>/status', methods=['PUT'])
@@ -206,7 +261,7 @@ def update_account_status(account_id):
             }), 400
 
         # 查找账号
-        account = Account.query.get(account_id)
+        account = db.session.get(Account, account_id)
         if not account:
             return jsonify({
                 'status': 'error',
@@ -218,12 +273,9 @@ def update_account_status(account_id):
 
         # 严格检查账号所有权 - 只有明确归属于当前用户或管理员的账号才能修改
         # 不再自动归属无主账号
-        if not hasattr(account, 'user_id') or account.user_id is None:
+        if account.user_id is None:
             if user.id == 1:  # 管理员可以处理无主账号
-                try:
-                    account.user_id = user.id  # 管理员可以认领无主账号
-                except:
-                    pass  # 如果列不存在，忽略错误
+                account.user_id = user.id  # 管理员可以认领无主账号
             else:
                 return jsonify({
                     'status': 'error',
@@ -245,11 +297,12 @@ def update_account_status(account_id):
             'account': account.to_dict()
         })
 
-    except Exception as e:
+    except Exception:
+        db.session.rollback()
         logger.error(f"更新账号状态失败: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': '更新账号状态失败，请稍后再试'
         }), 500
 
 # 管理员获取所有账号
@@ -286,9 +339,9 @@ def admin_get_accounts():
             'accounts': [account.to_dict() for account in accounts.items]
         })
 
-    except Exception as e:
+    except Exception:
         logger.error(f"管理员获取所有账号失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '获取账号列表失败，请稍后再试'}), 500
 
 # 管理员获取所有用户
 @api_bp.route('/admin/users', methods=['GET'])
@@ -313,9 +366,9 @@ def admin_get_users():
             'users': users
         })
 
-    except Exception as e:
+    except Exception:
         logger.error(f"管理员获取所有用户失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': '获取用户列表失败，请稍后再试'}), 500
 
 # 逻辑删除账号
 @api_bp.route('/account/<int:account_id>/delete', methods=['PUT'])
@@ -323,7 +376,7 @@ def admin_get_users():
 def delete_account(account_id):
     try:
         # 查找账号
-        account = Account.query.get(account_id)
+        account = db.session.get(Account, account_id)
         if not account:
             return jsonify({
                 'status': 'error',
@@ -358,11 +411,12 @@ def delete_account(account_id):
             'account': account.to_dict()
         })
 
-    except Exception as e:
+    except Exception:
+        db.session.rollback()
         logger.error(f"删除账号失败: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': '删除账号失败，请稍后再试'
         }), 500
 
 # 健康检查
@@ -396,7 +450,7 @@ def update_user(user_id):
             }), 400
 
         # 查找用户
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             logger.warning(f"用户不存在 - 用户ID: {user_id}")
             return jsonify({
@@ -426,9 +480,10 @@ def update_user(user_id):
             'user': user.to_dict()
         })
 
-    except Exception as e:
+    except Exception:
+        db.session.rollback()
         logger.error(f"更新用户信息失败: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': '更新用户信息失败，请稍后再试'
         }), 500

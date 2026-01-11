@@ -1,0 +1,11 @@
+{% macro button(text, variant="primary", size="md", type="button", id=None, extra_classes="", attrs="") -%}
+<button
+  type="{{ type }}"
+  class="btn btn--{{ variant }} btn--{{ size }} {{ extra_classes }}"
+  {% if id %}id="{{ id }}"{% endif %}
+  {{ attrs|safe }}
+>
+  {{ text }}
+</button>
+{%- endmacro %}
+

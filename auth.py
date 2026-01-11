@@ -1,9 +1,11 @@
 import time
 import uuid
-import jwt
 from functools import wraps
+
+import jwt
 from flask import jsonify, request
-from models import User
+
+from models import User, db
 
 # JWT密钥和过期时间将在app.py中设置
 SECRET_KEY = None
@@ -64,16 +66,16 @@ def token_required(f):
             if not user_id:
                 return jsonify({'status': 'error', 'message': '无效的令牌'}), 401
                 
-            current_user = User.query.get(user_id)
+            current_user = db.session.get(User, user_id)
             if not current_user:
                 return jsonify({'status': 'error', 'message': '用户不存在'}), 401
                 
         except jwt.ExpiredSignatureError:
             return jsonify({'status': 'error', 'message': '令牌已过期'}), 401
         except jwt.InvalidTokenError:
-            return jsonify({'status': 'error', 'message': '无效的令牌'}), 401
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': f'验证令牌错误: {str(e)}'}), 401
+            return jsonify({'status': 'error', 'message': '无效的令牌'}), 401   
+        except Exception:
+            return jsonify({'status': 'error', 'message': '验证令牌错误'}), 401
         
         # 将用户添加到请求上下文
         request.current_user = current_user
