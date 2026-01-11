@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from typing import Optional
 
 from flask import request
 
@@ -33,7 +34,7 @@ def register_request_context(app) -> None:
     def _after_request(response):
         response.headers["X-Request-ID"] = request_id_var.get()
 
-        duration_ms: float | None = None
+        duration_ms: Optional[float] = None
         try:
             start = getattr(request, "_start_time", None)
             if start is not None:
@@ -51,4 +52,3 @@ def register_request_context(app) -> None:
             )
 
         return response
-
