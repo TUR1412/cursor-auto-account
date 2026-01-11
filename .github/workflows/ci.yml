@@ -37,5 +37,11 @@ jobs:
       - name: Ruff Format
         run: python -m ruff format --check .
 
+      - name: Alembic (sqlite)
+        env:
+          DATABASE_URL: sqlite:///ci.db
+          SECRET_KEY: ci-secret
+        run: python -m alembic -c alembic.ini upgrade head
+
       - name: Pytest
         run: python -m pytest --cov --cov-report=term-missing:skip-covered --cov-fail-under=70

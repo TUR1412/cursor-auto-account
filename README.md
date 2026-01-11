@@ -100,10 +100,12 @@ alembic stamp head
 |---|---|---|
 | `DATABASE_URL` | 优先使用的 SQLAlchemy 连接串（推荐本地/测试） | `sqlite:///data.db` |
 | `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` | MySQL 连接参数（未设置 `DATABASE_URL` 时使用） |  |
+| `DB_MIGRATION_MODE` | 数据库迁移模式：`create_all`（默认）/ `alembic`（推荐生产） | `create_all` |
 | `SECRET_KEY` | JWT 签名密钥 | `change-me` |
 | `TOKEN_EXPIRY_DAYS` | Token 有效期（天） | `30` |
 | `LOG_LEVEL` | 日志级别 | `INFO` |
 | `LOG_FORMAT` | 日志格式 | `text` / `json` |
+| `CONFIG_STRICT` | 配置校验严格模式（遇到关键配置错误将启动失败） | `false` |
 | `METRICS_TOKEN` | 指标接口保护 Token（可选） | `your-token` |
 | `ACCOUNT_ENCRYPTION_KEY` | 账号密码加密密钥（可选，建议生产环境配置） | `Fernet.generate_key()` |
 | `RATE_LIMIT_ENABLED` | 轻量限流开关（可选） | `true` |
@@ -157,6 +159,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **Logout revokes tokens**: `POST /api/logout` invalidates the current token (jti blacklist)
 - **Quality gates**: built-in `pytest` tests and `ruff` lint checks
 - **Web console**: `GET /app` (no framework, fast, Lighthouse-friendly)
+- **Config validation**: startup warnings with optional strict mode (`CONFIG_STRICT=true`)
 
 ### Quick Start
 

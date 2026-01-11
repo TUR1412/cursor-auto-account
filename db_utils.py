@@ -1,8 +1,11 @@
 import logging
 import os
 import re
+import subprocess
+import sys
 import time
 import urllib.parse
+from pathlib import Path
 
 from sqlalchemy import create_engine, text
 
@@ -35,8 +38,24 @@ def init_db(app):
                     conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}`"))
                     conn.commit()
 
-            # 创建表
-            db.create_all()
+            migration_mode = (os.getenv("DB_MIGRATION_MODE") or "create_all").strip().lower()
+            if migration_mode in {"alembic", "migrate", "migration"}:
+                logging.info("DB_MIGRATION_MODE=%s，开始执行 Alembic 迁移", migration_mode)
+                project_root = Path(__file__).resolve().parent
+                try:
+                    subprocess.check_call(
+                        [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
+                        cwd=str(project_root),
+                    )
+                except FileNotFoundError:
+                    logging.warning("未安装 Alembic，回退到 db.create_all()")
+                    db.create_all()
+                except subprocess.CalledProcessError:
+                    logging.exception("Alembic 迁移失败")
+                    raise
+            else:
+                # 默认模式：创建表（适用于本地/测试/轻量部署）
+                db.create_all()
 
             logging.info("数据库初始化成功")
 

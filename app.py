@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from flask import Flask
 
 import auth
+from core.config_validation import validate_env
 from core.errors import register_error_handlers
 from core.logging_config import configure_logging
 from core.metrics import register_metrics
@@ -23,6 +24,7 @@ load_dotenv()
 # 创建并配置 Flask 应用
 def create_app():
     configure_logging()
+    validate_env()
     app = Flask(__name__)
 
     # 从环境变量获取数据库配置
