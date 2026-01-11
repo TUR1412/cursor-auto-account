@@ -47,6 +47,35 @@ function hideNotice() {
   el.className = "notice";
 }
 
+function normalizeErrorMessage(err) {
+  if (!err) return "未知错误";
+  if (typeof err === "string") return err;
+  if (err.message) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "未知错误";
+  }
+}
+
+window.addEventListener("error", (event) => {
+  try {
+    const message = normalizeErrorMessage(event?.error) || String(event?.message || "");
+    if (message) showNotice(message, "error");
+  } catch {
+    // ignore
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  try {
+    const message = normalizeErrorMessage(event?.reason);
+    if (message) showNotice(message, "error");
+  } catch {
+    // ignore
+  }
+});
+
 async function api(path, options = {}) {
   const headers = {
     "Content-Type": "application/json",

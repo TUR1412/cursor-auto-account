@@ -90,6 +90,9 @@ python -m pytest
 | `RATE_LIMIT_MAX_BUCKETS` | 限流内存桶上限（可选） | `5000` |
 | `ALLOW_SELF_REGISTER` | 是否允许用户自助注册（可选） | `true` |
 | `ALLOW_ADMIN_PASSWORD_EXPORT` | 是否允许管理员批量导出密码（强风险，默认关闭） | `false` |
+| `ADMIN_USERNAME` | 管理员用户名（用于创建默认管理员 + 管理员权限识别） | `admin` |
+| `ADMIN_PASSWORD` | 管理员密码（启动时会同步更新） | `admin` |
+| `ADMIN_USER_IDS` | 管理员用户 ID 白名单（逗号分隔，可选） | `1,2` |
 
 ### API 速查
 
@@ -127,6 +130,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **Audit logs**: query at `GET /api/audit/logs`
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
 - **Optional rate limiting**: `RATE_LIMIT_ENABLED`
+- **Admin access control**: `ADMIN_USERNAME` / `ADMIN_USER_IDS`
 - **Quality gates**: built-in `pytest` tests and `ruff` lint checks
 - **Web console**: `GET /app` (no framework, fast, Lighthouse-friendly)
 

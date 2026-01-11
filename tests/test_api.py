@@ -219,3 +219,21 @@ def test_admin_password_export_is_gated(tmp_path, monkeypatch):
     )
     assert allowed.status_code == 200
     assert allowed.json["accounts"][0]["password"] == "accpass2"
+
+
+def test_admin_required_respects_admin_username_and_ids(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, ADMIN_USERNAME="root")
+
+    reg = _register(client, username="admin", password="p", email="a2@example.com")
+    token = reg.json["token"]
+
+    blocked = client.get("/api/admin/users", headers=_auth_headers(token))
+    assert blocked.status_code == 403
+
+    me = client.get("/api/user", headers=_auth_headers(token))
+    assert me.status_code == 200
+    user_id = me.json["user"]["id"]
+
+    monkeypatch.setenv("ADMIN_USER_IDS", str(user_id))
+    allowed = client.get("/api/admin/users", headers=_auth_headers(token))
+    assert allowed.status_code == 200
