@@ -85,3 +85,31 @@ def test_metrics_endpoint(client):
     resp = client.get("/metrics")
     assert resp.status_code == 200
     assert "http_requests_total" in resp.get_data(as_text=True)
+
+
+def test_account_password_encryption_at_rest(app, client, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("ACCOUNT_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"))
+
+    reg = _register(client, username="enc_user", password="p@ss", email="enc@example.com")
+    token = reg.json["token"]
+
+    imported = client.post(
+        "/api/account",
+        headers=_auth_headers(token),
+        json={"email": "enc-acc@example.com", "password": "encpass", "expire_days": 1},
+    )
+    assert imported.status_code == 201
+    account_id = imported.json["account"]["id"]
+
+    # Stored value should be encrypted (prefixed), but revealed value should be plaintext.
+    from models import Account, db
+
+    with app.app_context():
+        stored = db.session.get(Account, account_id)
+        assert stored.password.startswith("enc:")
+
+    reveal = client.get(f"/api/account/{account_id}", headers=_auth_headers(token))
+    assert reveal.status_code == 200
+    assert reveal.json["account"]["password"] == "encpass"

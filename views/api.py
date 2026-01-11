@@ -10,6 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from account_service import create_account_for_user
 from auth import admin_required, generate_token, token_required
 from core.audit import record_audit
+from core.crypto import encrypt_secret
+from core.ratelimit import rate_limit
 from models import Account, AuditLog, User, db
 
 # 创建蓝图
@@ -47,6 +49,7 @@ def limit_concurrency(semaphore):
 
 # 用户注册
 @api_bp.route('/register', methods=['POST'])
+@rate_limit(limit=10, window_seconds=60, key_prefix="register")
 def register():
     try:
         data = request.json
@@ -96,6 +99,7 @@ def register():
 
 # 用户登录
 @api_bp.route('/login', methods=['POST'])
+@rate_limit(limit=30, window_seconds=60, key_prefix="login")
 def login():
     try:
         data = request.json
@@ -175,6 +179,7 @@ def get_account():
             return jsonify(result), 404
         return jsonify(result), 400
     except Exception as e:
+        db.session.rollback()
         logger.error(f"获取账号失败: {str(e)}")
         return jsonify({
             'status': 'error',
@@ -206,7 +211,7 @@ def import_account():
 
         account = Account(
             email=email,
-            password=password,
+            password=encrypt_secret(password),
             first_name=first_name,
             last_name=last_name,
             create_time=now,

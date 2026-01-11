@@ -5,6 +5,8 @@ from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from core.crypto import decrypt_secret
+
 db = SQLAlchemy()
 
 # 用户模型
@@ -88,7 +90,7 @@ class Account(db.Model):
         }
 
         if include_password:
-            data["password"] = self.password
+            data["password"] = decrypt_secret(self.password)
 
         data["user_id"] = self.user_id
 

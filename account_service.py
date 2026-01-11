@@ -27,7 +27,7 @@ def create_account_for_user(current_user):
 
         # 发放即标记为已使用，避免重复发放
         account.is_used = 1
-        db.session.commit()
+        db.session.flush()
 
         return {
             "status": "success",

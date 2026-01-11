@@ -83,6 +83,8 @@ python -m pytest
 | `TOKEN_EXPIRY_DAYS` | Token 有效期（天） | `30` |
 | `LOG_LEVEL` | 日志级别 | `INFO` |
 | `LOG_FORMAT` | 日志格式 | `text` / `json` |
+| `ACCOUNT_ENCRYPTION_KEY` | 账号密码加密密钥（可选，建议生产环境配置） | `Fernet.generate_key()` |
+| `RATE_LIMIT_ENABLED` | 轻量限流开关（可选） | `true` |
 
 ### API 速查
 
@@ -116,6 +118,9 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **JWT authentication** (Header/Cookie/Query supported)
 - **Account pool workflow**: import accounts, then “checkout” an unused one (checkout marks it as used)
 - **Observability**: `X-Request-ID`, Prometheus metrics at `GET /metrics`, optional JSON logs
+- **Audit logs**: query at `GET /api/audit/logs`
+- **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
+- **Optional rate limiting**: `RATE_LIMIT_ENABLED`
 - **Quality gates**: built-in `pytest` tests and `ruff` lint checks
 - **Web console**: `GET /app` (no framework, fast, Lighthouse-friendly)
 
