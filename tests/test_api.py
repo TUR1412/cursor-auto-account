@@ -54,6 +54,23 @@ def test_logout_revokes_token(client):
     assert me.json["status"] == "error"
 
 
+def test_admin_can_create_user(client):
+    admin_reg = _register(client, username="superadmin", password="p@ss", email="sa@example.com")
+    token = admin_reg.json["token"]
+
+    created = client.post(
+        "/api/admin/users",
+        headers=_auth_headers(token),
+        json={"username": "bob2", "password": "bob2-pass", "email": "bob2@example.com"},
+    )
+    assert created.status_code == 201
+    assert created.json["status"] == "success"
+    assert created.json["user"]["username"] == "bob2"
+
+    login = _login(client, username="bob2", password="bob2-pass")
+    assert login.status_code == 200
+
+
 def test_import_and_checkout_account_flow(client):
     reg = _register(client, username="bob", password="p@ss", email="bob@example.com")
     token = reg.json["token"]
@@ -147,6 +164,7 @@ def test_openapi_and_docs_routes(client):
     assert spec.is_json
     assert spec.json["openapi"].startswith("3.")
     assert "/api/login" in spec.json["paths"]
+    assert "/api/admin/users" in spec.json["paths"]
 
     docs = client.get("/docs")
     assert docs.status_code == 200

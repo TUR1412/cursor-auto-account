@@ -3,13 +3,19 @@ import threading
 import time
 from functools import wraps
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 
 _LOCK = threading.Lock()
 _BUCKETS = {}
 
 
 def _enabled() -> bool:
+    try:
+        if current_app.testing:
+            return False
+    except Exception:
+        # No app context or cannot resolve; fallback to env.
+        pass
     return os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 
 

@@ -122,6 +122,7 @@ alembic stamp head
 - `POST /api/login` 登录
 - `GET /api/user` 获取当前用户信息（需要 Token）
 - `POST /api/logout` 退出登录（撤销当前 Token）
+- `POST /api/admin/users` 管理员创建用户（建议生产环境关闭自助注册后使用）
 - `POST /api/account` 导入账号（需要 Token）
 - `GET /api/account` 发放一个未使用账号（需要 Token）
 - `GET /api/account/<id>` 获取单个账号详情（需要 Token）

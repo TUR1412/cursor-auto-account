@@ -338,7 +338,30 @@ def build_openapi_spec() -> dict:
                         },
                     ],
                     "responses": {"200": {"description": "OK"}},
-                }
+                },
+                "post": {
+                    "summary": "Admin create user",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "username": {"type": "string"},
+                                        "password": {"type": "string"},
+                                        "email": {"type": "string"},
+                                    },
+                                    "required": ["username", "password"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {"description": "Created"},
+                        "409": {"description": "Conflict"},
+                    },
+                },
             },
             "/api/admin/audit/logs": {
                 "get": {

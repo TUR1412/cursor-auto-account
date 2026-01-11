@@ -472,6 +472,53 @@ def admin_get_users():
         return jsonify({"status": "error", "message": "获取用户列表失败，请稍后再试"}), 500
 
 
+@api_bp.route("/admin/users", methods=["POST"])
+@admin_required
+def admin_create_user():
+    try:
+        data = request.json or {}
+
+        username = (data.get("username") or "").strip()
+        password = data.get("password")
+        email = (data.get("email") or "").strip() or None
+
+        if not username or not password:
+            return jsonify({"status": "error", "message": "缺少必要参数: username/password"}), 400
+
+        if User.query.filter_by(username=username).first():
+            return jsonify({"status": "error", "message": "用户名已存在"}), 409
+
+        if email and User.query.filter_by(email=email).first():
+            return jsonify({"status": "error", "message": "邮箱已存在"}), 409
+
+        user = User(
+            username=username,
+            password_hash=User.hash_password(password),
+            email=email,
+            created_at=int(time.time()),
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        record_audit(
+            action="admin.user.create",
+            user=request.current_user,
+            entity_type="user",
+            entity_id=user.id,
+            detail={"username": username, "email": email},
+        )
+        db.session.commit()
+
+        return (
+            jsonify({"status": "success", "message": "用户已创建", "user": user.to_dict()}),
+            201,
+        )
+    except Exception:
+        db.session.rollback()
+        logger.error(f"管理员创建用户失败: {traceback.format_exc()}")
+        return jsonify({"status": "error", "message": "创建用户失败，请稍后再试"}), 500
+
+
 # 逻辑删除账号
 @api_bp.route("/account/<int:account_id>/delete", methods=["PUT"])
 @token_required
