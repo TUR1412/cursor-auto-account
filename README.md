@@ -77,6 +77,23 @@ python -m ruff check .
 python -m pytest
 ```
 
+### 数据库迁移（Alembic）
+
+本项目默认仍可通过 `init_db()`/`db.create_all()` 自动创建表结构，但在生产环境更推荐使用 Alembic 来管理结构变更。
+
+新库（推荐）：
+
+```bash
+alembic upgrade head
+```
+
+已有库（历史版本通过 `create_all` 创建过表）：
+
+```bash
+# 在确认当前库结构与 models.py 一致后，将其标记为已处于最新版本
+alembic stamp head
+```
+
 ### 环境变量
 
 | 变量 | 说明 | 示例 |
@@ -166,6 +183,23 @@ Open:
 python -m pip install -r requirements-dev.txt
 python -m ruff check .
 python -m pytest
+```
+
+### Database Migrations (Alembic)
+
+This project can still bootstrap tables via `init_db()`/`db.create_all()`, but Alembic is recommended for production schema management.
+
+For a fresh database:
+
+```bash
+alembic upgrade head
+```
+
+For an existing database created by older versions (via `create_all`):
+
+```bash
+# After verifying the schema matches models.py, mark it as up-to-date
+alembic stamp head
 ```
 
 ---

@@ -7,3 +7,4 @@ PyJWT==2.8.0
 cryptography
 prometheus-client==0.21.1
 waitress==3.0.2
+alembic==1.18.0
