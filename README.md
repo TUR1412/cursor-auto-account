@@ -21,6 +21,7 @@
   - `X-Request-ID` 请求链路标识
   - Prometheus 指标 `GET /metrics`
   - 可选 JSON 日志（`LOG_FORMAT=json`）
+- **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`）
 - **质量保障**：内置 `pytest` 单元测试 + `ruff` 静态检查
 - **Web 控制台**：访问 `GET /app`（无框架、轻量、性能友好）
 
@@ -56,6 +57,12 @@ python -m pip install -r requirements.txt
 python app.py
 ```
 
+生产运行（推荐，使用 Waitress）：
+
+```bash
+waitress-serve --listen=0.0.0.0:8001 wsgi:app
+```
+
 > 本地/测试推荐使用 sqlite：设置 `DATABASE_URL=sqlite:///data.db`。
 
 ### 开发与自测
@@ -84,9 +91,12 @@ python -m pytest
 - `GET /api/user` 获取当前用户信息（需要 Token）
 - `POST /api/account` 导入账号（需要 Token）
 - `GET /api/account` 发放一个未使用账号（需要 Token）
+- `GET /api/account/<id>` 获取单个账号详情（需要 Token）
 - `GET /api/accounts` 获取当前用户账号列表（需要 Token）
 - `PUT /api/account/<id>/status` 更新账号使用状态（需要 Token）
 - `PUT /api/account/<id>/delete` 删除账号（需要 Token）
+- `GET /api/audit/logs` 获取当前用户审计日志（需要 Token）
+- `GET /api/admin/audit/logs` 管理员审计日志（需要管理员 Token）
 - `GET /api/health` 健康检查
 - `GET /metrics` Prometheus 指标
 
@@ -114,6 +124,12 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 ```bash
 python -m pip install -r requirements.txt
 python app.py
+```
+
+Production (recommended, Waitress):
+
+```bash
+waitress-serve --listen=0.0.0.0:8001 wsgi:app
 ```
 
 Open:

@@ -91,7 +91,27 @@
           <tbody></tbody>
         </table>
       </div>
+
+      <div class="divider"></div>
+
+      <div class="row row--between">
+        <h3 class="h3">审计日志</h3>
+        <button class="btn btn--ghost btn--sm" id="btnRefreshLogs" type="button">刷新日志</button>
+      </div>
+
+      <div class="tableWrap" role="region" aria-label="审计日志" tabindex="0">
+        <table class="table" id="logsTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 {% endblock %}
-

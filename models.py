@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -74,11 +74,10 @@ class Account(db.Model):
     # 关联用户
     user = relationship("User", back_populates="accounts")
 
-    def to_dict(self):
+    def to_dict(self, include_password: bool = False):
         data = {
             'id': self.id,
             'email': self.email,
-            'password': self.password,
             'first_name': self.first_name,
             'last_name': self.last_name,
             'create_time': self.create_time,
@@ -88,6 +87,40 @@ class Account(db.Model):
             'expire_time_fmt': datetime.fromtimestamp(self.expire_time).strftime('%Y-%m-%d %H:%M:%S')
         }
 
+        if include_password:
+            data["password"] = self.password
+
         data["user_id"] = self.user_id
 
         return data
+
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    entity_type = Column(String(64), nullable=True)
+    entity_id = Column(Integer, nullable=True)
+    request_id = Column(String(64), nullable=False, index=True)
+    ip = Column(String(64), nullable=True)
+    user_agent = Column(String(255), nullable=True)
+    detail = Column(Text, nullable=True)
+    created_at = Column(BigInteger, nullable=False, index=True)
+
+    user = relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "action": self.action,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "request_id": self.request_id,
+            "ip": self.ip,
+            "user_agent": self.user_agent,
+            "detail": self.detail,
+            "created_at": self.created_at,
+        }

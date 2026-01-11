@@ -50,6 +50,11 @@ def test_import_and_checkout_account_flow(client):
     assert imported.json["status"] == "success"
     account_id = imported.json["account"]["id"]
 
+    detail = client.get(f"/api/account/{account_id}", headers=_auth_headers(token))
+    assert detail.status_code == 200
+    assert detail.json["status"] == "success"
+    assert detail.json["account"]["password"]
+
     checkout = client.get("/api/account", headers=_auth_headers(token))
     assert checkout.status_code == 200
     assert checkout.json["status"] == "success"
@@ -67,9 +72,16 @@ def test_import_and_checkout_account_flow(client):
     assert len(accounts.json["accounts"]) == 1
     assert accounts.json["accounts"][0]["id"] == account_id
 
+    # Audit logs should include key actions
+    logs = client.get("/api/audit/logs?per_page=20", headers=_auth_headers(token))
+    assert logs.status_code == 200
+    actions = {item["action"] for item in logs.json["logs"]}
+    assert "user.register" in actions
+    assert "account.import" in actions
+    assert "account.checkout" in actions
+
 
 def test_metrics_endpoint(client):
     resp = client.get("/metrics")
     assert resp.status_code == 200
     assert "http_requests_total" in resp.get_data(as_text=True)
-

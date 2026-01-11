@@ -87,6 +87,12 @@ function fmtExpire(account) {
   return account.expire_time_fmt || String(account.expire_time || "");
 }
 
+function fmtTime(epochSeconds) {
+  if (!epochSeconds) return "";
+  const d = new Date(Number(epochSeconds) * 1000);
+  return d.toLocaleString();
+}
+
 function renderAccounts(accounts) {
   const tbody = $("accountsTable").querySelector("tbody");
   tbody.innerHTML = "";
@@ -122,7 +128,8 @@ function renderAccounts(accounts) {
     try {
       hideNotice();
       if (action === "copy") {
-        const acc = accounts.find((a) => String(a.id) === String(id));
+        const data = await api(`/api/account/${id}`);
+        const acc = data.account;
         const text = `${acc.email}\n${acc.password}`;
         await navigator.clipboard.writeText(text);
         showNotice("已复制到剪贴板", "success");
@@ -152,6 +159,30 @@ function renderAccounts(accounts) {
   };
 }
 
+function renderLogs(logs) {
+  const tbody = $("logsTable").querySelector("tbody");
+  tbody.innerHTML = "";
+
+  for (const log of logs) {
+    let detailText = "";
+    try {
+      detailText = log.detail ? JSON.stringify(JSON.parse(log.detail)) : "";
+    } catch {
+      detailText = log.detail || "";
+    }
+
+    const entity = log.entity_type ? `${log.entity_type}#${log.entity_id || ""}` : "";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${fmtTime(log.created_at)}</td>
+      <td><code>${log.action}</code></td>
+      <td>${entity}</td>
+      <td><code>${detailText}</code></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
 async function refreshAccounts() {
   const data = await api("/api/accounts");
   const accounts = data.accounts || [];
@@ -159,11 +190,26 @@ async function refreshAccounts() {
   renderAccounts(accounts);
 }
 
+async function refreshLogs() {
+  const data = await api("/api/audit/logs?per_page=10");
+  renderLogs(data.logs || []);
+}
+
 async function bootstrap() {
   $("btnLogout").addEventListener("click", () => {
     clearToken();
     setGuestUI();
     showNotice("已退出登录", "success");
+  });
+
+  $("btnRefreshLogs").addEventListener("click", async () => {
+    try {
+      hideNotice();
+      await refreshLogs();
+      showNotice("日志已刷新", "success");
+    } catch (err) {
+      showNotice(err.message || "刷新失败", "error");
+    }
   });
 
   $("loginForm").addEventListener("submit", async (e) => {
@@ -180,6 +226,7 @@ async function bootstrap() {
       const me = await api("/api/user");
       setAuthedUI(me.user);
       await refreshAccounts();
+      await refreshLogs();
       showNotice("登录成功", "success");
     } catch (err) {
       showNotice(err.message || "登录失败", "error");
@@ -201,6 +248,7 @@ async function bootstrap() {
       const me = await api("/api/user");
       setAuthedUI(me.user);
       await refreshAccounts();
+      await refreshLogs();
       showNotice("注册成功", "success");
     } catch (err) {
       showNotice(err.message || "注册失败", "error");
@@ -231,6 +279,7 @@ async function bootstrap() {
       const data = await api("/api/account");
       $("checkoutResult").textContent = JSON.stringify(data.account, null, 2);
       await refreshAccounts();
+      await refreshLogs();
       showNotice("账号已发放（已自动标记为已用）", "success");
     } catch (err) {
       $("checkoutResult").textContent = "";
@@ -259,6 +308,7 @@ async function bootstrap() {
     const me = await api("/api/user");
     setAuthedUI(me.user);
     await refreshAccounts();
+    await refreshLogs();
   } catch {
     clearToken();
     setGuestUI();

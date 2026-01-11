@@ -9,7 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from account_service import create_account_for_user
 from auth import admin_required, generate_token, token_required
-from models import Account, User, db
+from core.audit import record_audit
+from models import Account, AuditLog, User, db
 
 # 创建蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -74,6 +75,8 @@ def register():
         )
 
         db.session.add(new_user)
+        db.session.flush()
+        record_audit(action="user.register", user=new_user, detail={"username": new_user.username})
         db.session.commit()
 
         # 生成token
@@ -113,6 +116,7 @@ def login():
 
         # 更新最后登录时间
         user.last_login = int(time.time())
+        record_audit(action="user.login", user=user, detail={"username": user.username})
         db.session.commit()
 
         # 生成token
@@ -157,6 +161,15 @@ def get_account():
         logger.info(f"用户 {request.current_user.id} 请求获取账号")
         result = create_account_for_user(request.current_user)
         if result.get('status') == 'success':
+            account = result.get("account") or {}
+            record_audit(
+                action="account.checkout",
+                user=request.current_user,
+                entity_type="account",
+                entity_id=account.get("id"),
+                detail={"email": account.get("email")},
+            )
+            db.session.commit()
             return jsonify(result), 200
         if result.get("code") == "NO_AVAILABLE_ACCOUNT":
             return jsonify(result), 404
@@ -204,6 +217,14 @@ def import_account():
         )
 
         db.session.add(account)
+        db.session.flush()
+        record_audit(
+            action="account.import",
+            user=request.current_user,
+            entity_type="account",
+            entity_id=account.id,
+            detail={"email": account.email},
+        )
         db.session.commit()
 
         return (
@@ -214,10 +235,10 @@ def import_account():
     except IntegrityError:
         db.session.rollback()
         return jsonify({"status": "error", "message": "该邮箱已存在，无法重复导入"}), 409
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         logger.error(f"导入账号失败: {traceback.format_exc()}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "导入账号失败，请稍后再试"}), 500
 
 # 获取用户的所有账号
 @api_bp.route('/accounts', methods=['GET'])
@@ -246,6 +267,30 @@ def get_user_accounts():
     except Exception:
         logger.error(f"获取用户账号失败: {traceback.format_exc()}")
         return jsonify({'status': 'error', 'message': '获取账号列表失败，请稍后再试'}), 500
+
+# 获取单个账号详情（需要权限）
+@api_bp.route("/account/<int:account_id>", methods=["GET"])
+@token_required
+def get_account_detail(account_id):
+    account = db.session.get(Account, account_id)
+    if not account or account.is_deleted == 1:
+        return jsonify({"status": "error", "message": f"账号 ID {account_id} 不存在"}), 404
+
+    user = request.current_user
+    if account.user_id is not None and account.user_id != user.id and user.id != 1:
+        return jsonify({"status": "error", "message": "无权查看此账号"}), 403
+
+    record_audit(
+        action="account.reveal",
+        user=user,
+        entity_type="account",
+        entity_id=account.id,
+        detail={"email": account.email},
+    )
+    db.session.commit()
+
+    return jsonify({"status": "success", "account": account.to_dict(include_password=True)}), 200
+
 
 # 修改账号使用状态
 @api_bp.route('/account/<int:account_id>/status', methods=['PUT'])
@@ -289,6 +334,13 @@ def update_account_status(account_id):
 
         # 更新状态
         account.is_used = data['is_used']
+        record_audit(
+            action="account.update_status",
+            user=request.current_user,
+            entity_type="account",
+            entity_id=account.id,
+            detail={"is_used": int(account.is_used)},
+        )
         db.session.commit()
 
         return jsonify({
@@ -312,6 +364,7 @@ def admin_get_accounts():
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
+        include_password = request.args.get("include_password", "false").lower() == "true"
 
         # 获取查询参数，是否包含已删除的账号
         show_deleted = request.args.get('show_deleted', 'false').lower() == 'true'
@@ -336,7 +389,7 @@ def admin_get_accounts():
             'per_page': per_page,
             'total': total_accounts,
             'total_pages': total_pages,
-            'accounts': [account.to_dict() for account in accounts.items]
+            'accounts': [account.to_dict(include_password=include_password) for account in accounts.items]
         })
 
     except Exception:
@@ -387,7 +440,7 @@ def delete_account(account_id):
         user = request.current_user
 
         # 严格检查账号所有权 - 只有明确归属于当前用户或管理员的账号才能删除
-        if not hasattr(account, 'user_id') or account.user_id is None:
+        if account.user_id is None:
             if user.id == 1:  # 管理员可以处理无主账号
                 pass
             else:
@@ -403,6 +456,13 @@ def delete_account(account_id):
 
         # 更新删除状态
         account.is_deleted = 1
+        record_audit(
+            action="account.delete",
+            user=request.current_user,
+            entity_type="account",
+            entity_id=account.id,
+            detail={"email": account.email},
+        )
         db.session.commit()
 
         return jsonify({
@@ -471,6 +531,12 @@ def update_user(user_id):
         if 'password' in data:
             user.password_hash = User.hash_password(data['password'])
 
+        record_audit(
+            action="user.update",
+            user=request.current_user,
+            entity_type="user",
+            entity_id=user.id,
+        )
         db.session.commit()
         logger.info(f"用户信息更新成功 - 用户ID: {user_id}")
 
@@ -480,6 +546,9 @@ def update_user(user_id):
             'user': user.to_dict()
         })
 
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 400
     except Exception:
         db.session.rollback()
         logger.error(f"更新用户信息失败: {traceback.format_exc()}")
@@ -487,3 +556,54 @@ def update_user(user_id):
             'status': 'error',
             'message': '更新用户信息失败，请稍后再试'
         }), 500
+
+
+# 获取当前用户的审计日志
+@api_bp.route("/audit/logs", methods=["GET"])
+@token_required
+def get_audit_logs():
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+
+    query = AuditLog.query.filter_by(user_id=request.current_user.id).order_by(
+        AuditLog.created_at.desc()
+    )
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify(
+        {
+            "status": "success",
+            "page": page,
+            "per_page": per_page,
+            "total": pagination.total,
+            "total_pages": pagination.pages,
+            "logs": [log.to_dict() for log in pagination.items],
+        }
+    )
+
+
+# 管理员获取审计日志
+@api_bp.route("/admin/audit/logs", methods=["GET"])
+@admin_required
+def admin_get_audit_logs():
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    user_id = request.args.get("user_id", None, type=int)
+
+    query = AuditLog.query
+    if user_id is not None:
+        query = query.filter_by(user_id=user_id)
+
+    query = query.order_by(AuditLog.created_at.desc())
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify(
+        {
+            "status": "success",
+            "page": page,
+            "per_page": per_page,
+            "total": pagination.total,
+            "total_pages": pagination.pages,
+            "logs": [log.to_dict() for log in pagination.items],
+        }
+    )

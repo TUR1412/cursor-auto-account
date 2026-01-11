@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # Start the Python application
-python app.py
+waitress-serve --listen=0.0.0.0:8001 wsgi:app

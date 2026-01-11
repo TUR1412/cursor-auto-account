@@ -18,7 +18,16 @@ def register_request_context(app) -> None:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request_id_var.set(request_id)
 
-        # Best-effort user id propagation (auth decorator sets request.current_user)
+        # Auth decorator sets request.current_user after view dispatch; keep a default here.
+        user_id_var.set("-")
+
+        request._start_time = time.perf_counter()  # type: ignore[attr-defined]
+
+    @app.after_request
+    def _after_request(response):
+        response.headers["X-Request-ID"] = request_id_var.get()
+
+        # Update user id if authentication succeeded.
         try:
             current_user = getattr(request, "current_user", None)
             if current_user is not None and getattr(current_user, "id", None) is not None:
@@ -28,11 +37,22 @@ def register_request_context(app) -> None:
         except Exception:
             user_id_var.set("-")
 
-        request._start_time = time.perf_counter()  # type: ignore[attr-defined]
-
-    @app.after_request
-    def _after_request(response):
-        response.headers["X-Request-ID"] = request_id_var.get()
+        # Security headers (best-effort). A reverse proxy (e.g. Caddy) can override these.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "img-src 'self' data:; "
+            "style-src 'self'; "
+            "script-src 'self'; "
+            "base-uri 'none'; "
+            "frame-ancestors 'none'",
+        )
 
         duration_ms: Optional[float] = None
         try:

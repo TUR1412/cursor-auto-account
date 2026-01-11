@@ -1,3 +1,5 @@
+import logging
+
 from models import Account, db
 
 
@@ -30,9 +32,10 @@ def create_account_for_user(current_user):
         return {
             "status": "success",
             "message": "账号已发放",
-            "account": account.to_dict(),
+            "account": account.to_dict(include_password=True),
         }
 
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
-        return {"status": "error", "code": "INTERNAL_ERROR", "message": str(exc)}
+        logging.exception("Failed to checkout account")
+        return {"status": "error", "code": "INTERNAL_ERROR", "message": "发放账号失败，请稍后再试"}
