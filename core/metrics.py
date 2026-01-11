@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from flask import Response, request
@@ -59,5 +60,18 @@ def register_metrics(app) -> None:
 
     @app.get("/metrics")
     def metrics():  # noqa: A001
-        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+        token = os.getenv("METRICS_TOKEN")
+        if token:
+            auth = request.headers.get("Authorization", "")
+            provided = None
+            if auth.startswith("Bearer "):
+                provided = auth[7:]
+            if not provided:
+                provided = request.headers.get("X-Metrics-Token") or request.args.get("token")
 
+            if provided != token:
+                resp = Response("unauthorized\n", status=401, mimetype="text/plain")
+                resp.headers["WWW-Authenticate"] = "Bearer"
+                return resp
+
+        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)

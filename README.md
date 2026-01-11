@@ -49,6 +49,7 @@ docker-compose up -d --build
 - Web 控制台：`http://localhost:8001/app`
 - 健康检查：`http://localhost:8001/api/health`
 - 监控指标：`http://localhost:8001/metrics`
+- 就绪探针（含DB检测）：`http://localhost:8001/api/health?ready=1`
 
 ### 本地运行
 
@@ -83,8 +84,12 @@ python -m pytest
 | `TOKEN_EXPIRY_DAYS` | Token 有效期（天） | `30` |
 | `LOG_LEVEL` | 日志级别 | `INFO` |
 | `LOG_FORMAT` | 日志格式 | `text` / `json` |
+| `METRICS_TOKEN` | 指标接口保护 Token（可选） | `your-token` |
 | `ACCOUNT_ENCRYPTION_KEY` | 账号密码加密密钥（可选，建议生产环境配置） | `Fernet.generate_key()` |
 | `RATE_LIMIT_ENABLED` | 轻量限流开关（可选） | `true` |
+| `RATE_LIMIT_MAX_BUCKETS` | 限流内存桶上限（可选） | `5000` |
+| `ALLOW_SELF_REGISTER` | 是否允许用户自助注册（可选） | `true` |
+| `ALLOW_ADMIN_PASSWORD_EXPORT` | 是否允许管理员批量导出密码（强风险，默认关闭） | `false` |
 
 ### API 速查
 
@@ -141,6 +146,7 @@ Open:
 
 - `http://localhost:8001/app`
 - `http://localhost:8001/metrics`
+- `http://localhost:8001/api/health?ready=1` (readiness probe with DB check)
 
 ### Development
 

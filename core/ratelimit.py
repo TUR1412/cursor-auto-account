@@ -49,6 +49,13 @@ def rate_limit(*, limit: int, window_seconds: int, key_prefix: str = "rl"):
                 if count > limit:
                     retry_after = max(1, reset_at - now)
 
+                # Best-effort cleanup to avoid unbounded growth.
+                max_buckets = int(os.getenv("RATE_LIMIT_MAX_BUCKETS", "5000"))
+                if len(_BUCKETS) > max_buckets:
+                    expired_keys = [k for k, (_, ra) in _BUCKETS.items() if now >= ra]
+                    for k in expired_keys:
+                        _BUCKETS.pop(k, None)
+
             if count > limit:
                 resp = jsonify({"status": "error", "message": "请求过于频繁，请稍后再试"})
                 resp.status_code = 429

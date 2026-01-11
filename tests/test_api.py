@@ -18,6 +18,10 @@ def test_health_check(client):
     assert resp.status_code == 200
     assert resp.json["status"] == "ok"
 
+    ready = client.get("/api/health?ready=1")
+    assert ready.status_code == 200
+    assert ready.json["db"] == "ok"
+
 
 def test_register_login_and_user_info(client):
     resp = _register(client)
@@ -113,3 +117,68 @@ def test_account_password_encryption_at_rest(app, client, monkeypatch):
     reveal = client.get(f"/api/account/{account_id}", headers=_auth_headers(token))
     assert reveal.status_code == 200
     assert reveal.json["account"]["password"] == "encpass"
+
+
+def _make_client(tmp_path, monkeypatch, **env):
+    from app import create_app
+    from models import db
+
+    db_path = tmp_path / "test.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("TOKEN_EXPIRY_DAYS", "30")
+
+    for k, v in env.items():
+        monkeypatch.setenv(k, str(v))
+
+    application = create_app()
+    application.config.update(TESTING=True)
+
+    with application.app_context():
+        db.create_all()
+
+    return application.test_client()
+
+
+def test_metrics_token_protection(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, METRICS_TOKEN="secret-token")
+
+    unauth = client.get("/metrics")
+    assert unauth.status_code == 401
+
+    ok = client.get("/metrics", headers={"Authorization": "Bearer secret-token"})
+    assert ok.status_code == 200
+
+
+def test_self_register_can_be_disabled(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, ALLOW_SELF_REGISTER="false")
+    resp = _register(client, username="u1", password="p1", email="u1@example.com")
+    assert resp.status_code == 403
+
+
+def test_admin_password_export_is_gated(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+
+    reg = _register(client, username="admin", password="p", email="a@example.com")
+    token = reg.json["token"]
+
+    imported = client.post(
+        "/api/account",
+        headers=_auth_headers(token),
+        json={"email": "acc2@example.com", "password": "accpass2", "expire_days": 1},
+    )
+    assert imported.status_code == 201
+
+    blocked = client.get(
+        "/api/admin/accounts?include_password=true",
+        headers=_auth_headers(token),
+    )
+    assert blocked.status_code == 403
+
+    monkeypatch.setenv("ALLOW_ADMIN_PASSWORD_EXPORT", "true")
+    allowed = client.get(
+        "/api/admin/accounts?include_password=true",
+        headers=_auth_headers(token),
+    )
+    assert allowed.status_code == 200
+    assert allowed.json["accounts"][0]["password"] == "accpass2"

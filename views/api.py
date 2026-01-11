@@ -1,10 +1,13 @@
 import logging
+import os
 import threading
 import time
 import traceback
+from datetime import datetime
 from functools import wraps
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from account_service import create_account_for_user
@@ -52,6 +55,9 @@ def limit_concurrency(semaphore):
 @rate_limit(limit=10, window_seconds=60, key_prefix="register")
 def register():
     try:
+        if os.getenv("ALLOW_SELF_REGISTER", "true").lower() != "true":
+            return jsonify({"status": "error", "message": "已禁用自助注册"}), 403
+
         data = request.json
 
         if not data or not data.get('username') or not data.get('password'):
@@ -370,6 +376,10 @@ def admin_get_accounts():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         include_password = request.args.get("include_password", "false").lower() == "true"
+        if include_password and os.getenv("ALLOW_ADMIN_PASSWORD_EXPORT", "false").lower() != "true":
+            record_audit(action="admin.password_export.blocked", user=request.current_user)
+            db.session.commit()
+            return jsonify({"status": "error", "message": "已禁用管理员批量导出密码"}), 403
 
         # 获取查询参数，是否包含已删除的账号
         show_deleted = request.args.get('show_deleted', 'false').lower() == 'true'
@@ -487,8 +497,21 @@ def delete_account(account_id):
 # 健康检查
 @api_bp.route('/health', methods=['GET'])
 def health_check():
-    from datetime import datetime
-    return jsonify({'status': 'ok', 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}), 200
+    payload = {'status': 'ok', 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+    # Readiness probe: check database connectivity only when requested.
+    ready = request.args.get("ready", "false").lower() in {"1", "true", "yes"}
+    if ready:
+        try:
+            db.session.execute(text("SELECT 1"))
+            payload["db"] = "ok"
+            return jsonify(payload), 200
+        except Exception:
+            payload["status"] = "error"
+            payload["db"] = "error"
+            return jsonify(payload), 503
+
+    return jsonify(payload), 200
 
 @api_bp.route('/user/<int:user_id>', methods=['PUT'])
 @token_required
