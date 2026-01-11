@@ -147,6 +147,22 @@ def test_admin_audit_logs_can_filter_by_user_id(client):
     assert all(item["user_id"] == bob_id for item in filtered.json["logs"])
 
 
+def test_admin_audit_logs_support_query_filter(client):
+    admin_reg = _register(client, username="superadmin", password="p@ss", email="sa@example.com")
+    admin_token = admin_reg.json["token"]
+
+    _register(client, username="bob-audit-2", password="p", email="bob2@example.com")
+
+    filtered = client.get(
+        "/api/admin/audit/logs?q=user.register&per_page=50",
+        headers=_auth_headers(admin_token),
+    )
+    assert filtered.status_code == 200
+    assert filtered.json["status"] == "success"
+    assert filtered.json["logs"]
+    assert all("user.register" in item["action"] for item in filtered.json["logs"])
+
+
 def test_audit_logs_support_query_filter(client):
     reg = _register(client, username="qlog", password="p@ss", email="qlog@example.com")
     token = reg.json["token"]

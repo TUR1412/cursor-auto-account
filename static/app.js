@@ -30,6 +30,7 @@ const adminLogsState = {
   page: 1,
   perPage: 20,
   userId: "",
+  query: "",
 };
 
 function getToken() {
@@ -387,6 +388,8 @@ async function refreshAdminLogs() {
   params.set("per_page", String(adminLogsState.perPage));
   const userId = String(adminLogsState.userId || "").trim();
   if (userId) params.set("user_id", userId);
+  const query = String(adminLogsState.query || "").trim();
+  if (query) params.set("q", query);
 
   const data = await api(`/api/admin/audit/logs?${params.toString()}`);
   const logs = data.logs || [];
@@ -540,6 +543,24 @@ async function bootstrap() {
           usersState.query = usersQueryInput.value.trim();
           usersState.page = 1;
           await refreshUsers();
+        } catch (err) {
+          showNotice(err.message || "搜索失败", "error");
+        }
+      }, 250);
+    });
+  }
+
+  let adminLogsQueryTimer = null;
+  const adminLogsQueryInput = $("adminLogsQuery");
+  if (adminLogsQueryInput) {
+    adminLogsQueryInput.addEventListener("input", () => {
+      if (adminLogsQueryTimer) window.clearTimeout(adminLogsQueryTimer);
+      adminLogsQueryTimer = window.setTimeout(async () => {
+        try {
+          hideNotice();
+          adminLogsState.query = adminLogsQueryInput.value.trim();
+          adminLogsState.page = 1;
+          await refreshAdminLogs();
         } catch (err) {
           showNotice(err.message || "搜索失败", "error");
         }
