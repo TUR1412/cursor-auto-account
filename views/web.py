@@ -11,4 +11,3 @@ def index():
 @web_bp.get("/app")
 def app():
     return render_template("pages/app.html")
-

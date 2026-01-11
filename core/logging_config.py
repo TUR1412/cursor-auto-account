@@ -63,4 +63,3 @@ def configure_logging() -> None:
         )
 
     root.addHandler(handler)
-

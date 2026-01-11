@@ -99,7 +99,7 @@ python -m pytest
 - `POST /api/account` 导入账号（需要 Token）
 - `GET /api/account` 发放一个未使用账号（需要 Token）
 - `GET /api/account/<id>` 获取单个账号详情（需要 Token）
-- `GET /api/accounts` 获取当前用户账号列表（需要 Token）
+- `GET /api/accounts` 获取当前用户账号列表（需要 Token，支持 `page` / `per_page` / `q` / `used`）
 - `PUT /api/account/<id>/status` 更新账号使用状态（需要 Token）
 - `PUT /api/account/<id>/delete` 删除账号（需要 Token）
 - `GET /api/audit/logs` 获取当前用户审计日志（需要 Token）
@@ -122,6 +122,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 
 - **JWT authentication** (Header/Cookie/Query supported)
 - **Account pool workflow**: import accounts, then “checkout” an unused one (checkout marks it as used)
+- **Listing UX**: `/api/accounts` supports `page` / `per_page` / `q` / `used` for pagination and filtering
 - **Observability**: `X-Request-ID`, Prometheus metrics at `GET /metrics`, optional JSON logs
 - **Audit logs**: query at `GET /api/audit/logs`
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)

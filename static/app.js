@@ -8,6 +8,12 @@
 
 const storageKey = "cursor_account_token";
 
+const accountsState = {
+  page: 1,
+  perPage: 10,
+  query: "",
+};
+
 function getToken() {
   return localStorage.getItem(storageKey) || "";
 }
@@ -184,9 +190,37 @@ function renderLogs(logs) {
 }
 
 async function refreshAccounts() {
-  const data = await api("/api/accounts");
+  const params = new URLSearchParams();
+  params.set("page", String(accountsState.page));
+  params.set("per_page", String(accountsState.perPage));
+  if (accountsState.query) params.set("q", accountsState.query);
+
+  const data = await api(`/api/accounts?${params.toString()}`);
   const accounts = data.accounts || [];
-  $("accountsMeta").textContent = `共 ${data.total ?? accounts.length} 条`;
+
+  // If the current page becomes empty (e.g. after deletions), step back one
+  // page and retry once.
+  if (accounts.length === 0 && Number(data.page) > 1) {
+    accountsState.page = Number(data.page) - 1;
+    return refreshAccounts();
+  }
+
+  const total = Number(data.total ?? accounts.length);
+  const page = Number(data.page ?? accountsState.page);
+  const totalPages = Number(data.total_pages ?? 1) || 1;
+
+  const meta = $("accountsMeta");
+  if (meta) meta.textContent = `共 ${total} 条 · 每页 ${accountsState.perPage} 条`;
+
+  const pager = $("accountsPager");
+  if (pager) pager.textContent = `第 ${page}/${totalPages} 页`;
+
+  const prev = $("btnPrevPage");
+  if (prev) prev.disabled = page <= 1;
+
+  const next = $("btnNextPage");
+  if (next) next.disabled = page >= totalPages;
+
   renderAccounts(accounts);
 }
 
@@ -196,6 +230,68 @@ async function refreshLogs() {
 }
 
 async function bootstrap() {
+  const perPageSelect = $("accountsPerPage");
+  if (perPageSelect) {
+    accountsState.perPage = Number(perPageSelect.value || 10) || 10;
+  }
+
+  let queryTimer = null;
+  const queryInput = $("accountsQuery");
+  if (queryInput) {
+    queryInput.addEventListener("input", () => {
+      if (queryTimer) window.clearTimeout(queryTimer);
+      queryTimer = window.setTimeout(async () => {
+        try {
+          hideNotice();
+          accountsState.query = queryInput.value.trim();
+          accountsState.page = 1;
+          await refreshAccounts();
+        } catch (err) {
+          showNotice(err.message || "搜索失败", "error");
+        }
+      }, 250);
+    });
+  }
+
+  if (perPageSelect) {
+    perPageSelect.addEventListener("change", async () => {
+      try {
+        hideNotice();
+        accountsState.perPage = Number(perPageSelect.value || 10) || 10;
+        accountsState.page = 1;
+        await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
+  const btnPrev = $("btnPrevPage");
+  if (btnPrev) {
+    btnPrev.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        accountsState.page = Math.max(1, accountsState.page - 1);
+        await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
+  const btnNext = $("btnNextPage");
+  if (btnNext) {
+    btnNext.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        accountsState.page += 1;
+        await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
   $("btnLogout").addEventListener("click", () => {
     clearToken();
     setGuestUI();
@@ -290,6 +386,7 @@ async function bootstrap() {
   $("btnRefresh").addEventListener("click", async () => {
     try {
       hideNotice();
+      accountsState.page = 1;
       await refreshAccounts();
       showNotice("已刷新", "success");
     } catch (err) {

@@ -85,6 +85,43 @@ def test_import_and_checkout_account_flow(client):
     assert "account.checkout" in actions
 
 
+def test_accounts_query_and_pagination(client):
+    reg = _register(client, username="query_user", password="p@ss", email="q@example.com")
+    token = reg.json["token"]
+
+    emails = [
+        "alpha@example.com",
+        "beta@example.com",
+        "alpha-beta@example.com",
+    ]
+    for email in emails:
+        imported = client.post(
+            "/api/account",
+            headers=_auth_headers(token),
+            json={"email": email, "password": "accpass", "expire_days": 1},
+        )
+        assert imported.status_code == 201
+
+    filtered = client.get("/api/accounts?q=alpha&per_page=10", headers=_auth_headers(token))
+    assert filtered.status_code == 200
+    assert filtered.json["status"] == "success"
+    assert filtered.json["total"] == 2
+    assert all("alpha" in item["email"] for item in filtered.json["accounts"])
+
+    page1 = client.get("/api/accounts?per_page=1&page=1", headers=_auth_headers(token))
+    assert page1.status_code == 200
+    assert page1.json["status"] == "success"
+    assert page1.json["total"] == 3
+    assert page1.json["total_pages"] == 3
+    assert len(page1.json["accounts"]) == 1
+
+    page2 = client.get("/api/accounts?per_page=1&page=2", headers=_auth_headers(token))
+    assert page2.status_code == 200
+    assert page2.json["status"] == "success"
+    assert page2.json["total"] == 3
+    assert len(page2.json["accounts"]) == 1
+
+
 def test_metrics_endpoint(client):
     resp = client.get("/metrics")
     assert resp.status_code == 200

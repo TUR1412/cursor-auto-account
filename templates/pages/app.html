@@ -72,12 +72,33 @@
 
       <div class="divider"></div>
 
-      <div class="row row--between">
-        <h3 class="h3">我的账号列表</h3>
-        <span class="muted" id="accountsMeta"></span>
+      <div class="row row--between row--wrap">
+        <div class="row row--wrap">
+          <h3 class="h3">我的账号列表</h3>
+          <span class="muted" id="accountsMeta"></span>
+        </div>
+        <div class="row row--wrap">
+          <input
+            class="input input--sm"
+            id="accountsQuery"
+            type="search"
+            placeholder="搜索邮箱…"
+            autocomplete="off"
+            aria-label="搜索邮箱"
+          />
+          <select class="input input--sm" id="accountsPerPage" aria-label="每页数量">
+            <option value="10">10/页</option>
+            <option value="20">20/页</option>
+            <option value="50">50/页</option>
+            <option value="100">100/页</option>
+          </select>
+          <button class="btn btn--ghost btn--sm" id="btnPrevPage" type="button">上一页</button>
+          <span class="muted" id="accountsPager"></span>
+          <button class="btn btn--ghost btn--sm" id="btnNextPage" type="button">下一页</button>
+        </div>
       </div>
 
-      <div class="tableWrap" role="region" aria-label="账号列表" tabindex="0">
+      <div class="tableWrap" role="region" aria-label="账号列表" tabindex="0">  
         <table class="table" id="accountsTable">
           <thead>
             <tr>

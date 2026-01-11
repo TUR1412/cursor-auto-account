@@ -43,7 +43,9 @@ def register_request_context(app) -> None:
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
-        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+        )
         response.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; "

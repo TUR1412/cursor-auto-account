@@ -18,13 +18,14 @@ from core.ratelimit import rate_limit
 from models import Account, AuditLog, User, db
 
 # 创建蓝图
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 # 设置日志
 logger = logging.getLogger(__name__)
 
 # 创建一个信号量用于限制并发请求
 account_semaphore = threading.Semaphore(3)
+
 
 # 限流装饰器
 def limit_concurrency(semaphore):
@@ -36,10 +37,7 @@ def limit_concurrency(semaphore):
             if not acquired:
                 # 如果没有获取到信号量，返回响应码 429 (Too Many Requests)
                 logger.warning("并发请求数超过限制，拒绝处理请求")
-                return jsonify({
-                    'status': 'error',
-                    'message': '服务器繁忙，请稍后再试'
-                }), 429
+                return jsonify({"status": "error", "message": "服务器繁忙，请稍后再试"}), 429
 
             try:
                 # 执行原函数
@@ -47,11 +45,14 @@ def limit_concurrency(semaphore):
             finally:
                 # 无论成功与否，释放信号量
                 semaphore.release()
+
         return decorated_function
+
     return decorator
 
+
 # 用户注册
-@api_bp.route('/register', methods=['POST'])
+@api_bp.route("/register", methods=["POST"])
 @rate_limit(limit=10, window_seconds=60, key_prefix="register")
 def register():
     try:
@@ -60,27 +61,21 @@ def register():
 
         data = request.json
 
-        if not data or not data.get('username') or not data.get('password'):
-            return jsonify({
-                'status': 'error',
-                'message': '请提供用户名和密码'
-            }), 400
+        if not data or not data.get("username") or not data.get("password"):
+            return jsonify({"status": "error", "message": "请提供用户名和密码"}), 400
 
         # 检查用户名是否已存在
-        existing_user = User.query.filter_by(username=data['username']).first()
+        existing_user = User.query.filter_by(username=data["username"]).first()
         if existing_user:
-            return jsonify({
-                'status': 'error',
-                'message': '用户名已存在'
-            }), 400
+            return jsonify({"status": "error", "message": "用户名已存在"}), 400
 
         # 创建新用户
         new_user = User(
-            username=data['username'],
-            password_hash=User.hash_password(data['password']),
-            temp_email_address='zoowayss@mailto.plus',
-            email=data.get('email'),
-            created_at=int(time.time())
+            username=data["username"],
+            password_hash=User.hash_password(data["password"]),
+            temp_email_address="zoowayss@mailto.plus",
+            email=data.get("email"),
+            created_at=int(time.time()),
         )
 
         db.session.add(new_user)
@@ -91,38 +86,30 @@ def register():
         # 生成token
         token = generate_token(new_user.id)
 
-        return jsonify({
-            'status': 'success',
-            'message': '注册成功',
-            'user': new_user.to_dict(),
-            'token': token
-        })
+        return jsonify(
+            {"status": "success", "message": "注册成功", "user": new_user.to_dict(), "token": token}
+        )
 
     except Exception:
         db.session.rollback()
         logger.error(f"注册失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': '注册失败，请稍后再试'}), 500
+        return jsonify({"status": "error", "message": "注册失败，请稍后再试"}), 500
+
 
 # 用户登录
-@api_bp.route('/login', methods=['POST'])
+@api_bp.route("/login", methods=["POST"])
 @rate_limit(limit=30, window_seconds=60, key_prefix="login")
 def login():
     try:
         data = request.json
 
-        if not data or not data.get('username') or not data.get('password'):
-            return jsonify({
-                'status': 'error',
-                'message': '请提供用户名和密码'
-            }), 400
+        if not data or not data.get("username") or not data.get("password"):
+            return jsonify({"status": "error", "message": "请提供用户名和密码"}), 400
 
         # 查找用户
-        user = User.query.filter_by(username=data['username']).first()
-        if not user or not user.verify_password(data['password']):
-            return jsonify({
-                'status': 'error',
-                'message': '用户名或密码错误'
-            }), 401
+        user = User.query.filter_by(username=data["username"]).first()
+        if not user or not user.verify_password(data["password"]):
+            return jsonify({"status": "error", "message": "用户名或密码错误"}), 401
 
         # 更新最后登录时间
         user.last_login = int(time.time())
@@ -132,45 +119,39 @@ def login():
         # 生成token
         token = generate_token(user.id)
 
-        return jsonify({
-            'status': 'success',
-            'message': '登录成功',
-            'user': user.to_dict(),
-            'token': token
-        })
+        return jsonify(
+            {"status": "success", "message": "登录成功", "user": user.to_dict(), "token": token}
+        )
 
     except Exception:
         logger.error(f"登录失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': '登录失败，请稍后再试'}), 500
+        return jsonify({"status": "error", "message": "登录失败，请稍后再试"}), 500
+
 
 # 获取用户信息
-@api_bp.route('/user', methods=['GET'])
+@api_bp.route("/user", methods=["GET"])
 @token_required
 def get_user_info():
-    return jsonify({
-        'status': 'success',
-        'user': request.current_user.to_dict()
-    })
+    return jsonify({"status": "success", "user": request.current_user.to_dict()})
+
 
 # 退出登录
-@api_bp.route('/logout', methods=['POST'])
+@api_bp.route("/logout", methods=["POST"])
 @token_required
 def logout():
     # 无需数据库操作，客户端清除token即可
-    return jsonify({
-        'status': 'success',
-        'message': '已成功退出登录'
-    })
+    return jsonify({"status": "success", "message": "已成功退出登录"})
+
 
 # 获取一个可用账号 (已登录用户)
-@api_bp.route('/account', methods=['GET'])
+@api_bp.route("/account", methods=["GET"])
 @token_required
 @limit_concurrency(account_semaphore)
 def get_account():
     try:
         logger.info(f"用户 {request.current_user.id} 请求获取账号")
         result = create_account_for_user(request.current_user)
-        if result.get('status') == 'success':
+        if result.get("status") == "success":
             account = result.get("account") or {}
             record_audit(
                 action="account.checkout",
@@ -187,13 +168,11 @@ def get_account():
     except Exception as e:
         db.session.rollback()
         logger.error(f"获取账号失败: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': '获取账号失败，请稍后再试'
-        }), 500
+        return jsonify({"status": "error", "message": "获取账号失败，请稍后再试"}), 500
+
 
 # 导入账号（已登录用户）
-@api_bp.route('/account', methods=['POST'])
+@api_bp.route("/account", methods=["POST"])
 @token_required
 def import_account():
     try:
@@ -251,33 +230,52 @@ def import_account():
         logger.error(f"导入账号失败: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": "导入账号失败，请稍后再试"}), 500
 
+
 # 获取用户的所有账号
-@api_bp.route('/accounts', methods=['GET'])
+@api_bp.route("/accounts", methods=["GET"])
 @token_required
 def get_user_accounts():
     try:
         user_id = request.current_user.id
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        query_text = (request.args.get("q") or "").strip()
+        used = (request.args.get("used") or "").strip().lower()
+
+        page = max(page, 1)
+        per_page = max(min(per_page, 100), 1)
 
         # 查询用户的账号 - 只查询明确归属于该用户且未被删除的账号
-        query = Account.query.filter_by(user_id=user_id, is_deleted=0).order_by(Account.create_time.desc())
+        query = Account.query.filter_by(user_id=user_id, is_deleted=0).order_by(
+            Account.create_time.desc()
+        )
+
+        if query_text:
+            query = query.filter(Account.email.contains(query_text))
+
+        if used in {"true", "1"}:
+            query = query.filter_by(is_used=1)
+        elif used in {"false", "0"}:
+            query = query.filter_by(is_used=0)
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
         accounts = [account.to_dict() for account in pagination.items]
 
-        return jsonify({
-            'status': 'success',
-            'page': page,
-            'per_page': per_page,
-            'total': pagination.total,
-            'total_pages': pagination.pages,
-            'accounts': accounts
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "page": page,
+                "per_page": per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages,
+                "accounts": accounts,
+            }
+        )
 
     except Exception:
         logger.error(f"获取用户账号失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': '获取账号列表失败，请稍后再试'}), 500
+        return jsonify({"status": "error", "message": "获取账号列表失败，请稍后再试"}), 500
+
 
 # 获取单个账号详情（需要权限）
 @api_bp.route("/account/<int:account_id>", methods=["GET"])
@@ -304,25 +302,19 @@ def get_account_detail(account_id):
 
 
 # 修改账号使用状态
-@api_bp.route('/account/<int:account_id>/status', methods=['PUT'])
+@api_bp.route("/account/<int:account_id>/status", methods=["PUT"])
 @token_required
 def update_account_status(account_id):
     try:
         # 获取请求数据
         data = request.json
-        if data is None or 'is_used' not in data:
-            return jsonify({
-                'status': 'error',
-                'message': '缺少必要参数'
-            }), 400
+        if data is None or "is_used" not in data:
+            return jsonify({"status": "error", "message": "缺少必要参数"}), 400
 
         # 查找账号
         account = db.session.get(Account, account_id)
         if not account:
-            return jsonify({
-                'status': 'error',
-                'message': f'账号 ID {account_id} 不存在'
-            }), 404
+            return jsonify({"status": "error", "message": f"账号 ID {account_id} 不存在"}), 404
 
         # 检查用户权限
         user = request.current_user
@@ -333,18 +325,12 @@ def update_account_status(account_id):
             if user.id == 1:  # 管理员可以处理无主账号
                 account.user_id = user.id  # 管理员可以认领无主账号
             else:
-                return jsonify({
-                    'status': 'error',
-                    'message': '无权修改此账号'
-                }), 403
+                return jsonify({"status": "error", "message": "无权修改此账号"}), 403
         elif account.user_id != user.id and user.id != 1:
-            return jsonify({
-                'status': 'error',
-                'message': '无权修改此账号'
-                }), 403
+            return jsonify({"status": "error", "message": "无权修改此账号"}), 403
 
         # 更新状态
-        account.is_used = data['is_used']
+        account.is_used = data["is_used"]
         record_audit(
             action="account.update_status",
             user=request.current_user,
@@ -354,27 +340,25 @@ def update_account_status(account_id):
         )
         db.session.commit()
 
-        return jsonify({
-            'status': 'success',
-            'message': '账号状态已更新',
-            'account': account.to_dict()
-        })
+        return jsonify(
+            {"status": "success", "message": "账号状态已更新", "account": account.to_dict()}
+        )
 
     except Exception:
         db.session.rollback()
         logger.error(f"更新账号状态失败: {traceback.format_exc()}")
-        return jsonify({
-            'status': 'error',
-            'message': '更新账号状态失败，请稍后再试'
-        }), 500
+        return jsonify({"status": "error", "message": "更新账号状态失败，请稍后再试"}), 500
+
 
 # 管理员获取所有账号
-@api_bp.route('/admin/accounts', methods=['GET'])
+@api_bp.route("/admin/accounts", methods=["GET"])
 @admin_required
 def admin_get_accounts():
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        query_text = (request.args.get("q") or "").strip()
+        used = (request.args.get("used") or "").strip().lower()
         include_password = request.args.get("include_password", "false").lower() == "true"
         if include_password and os.getenv("ALLOW_ADMIN_PASSWORD_EXPORT", "false").lower() != "true":
             record_audit(action="admin.password_export.blocked", user=request.current_user)
@@ -382,7 +366,10 @@ def admin_get_accounts():
             return jsonify({"status": "error", "message": "已禁用管理员批量导出密码"}), 403
 
         # 获取查询参数，是否包含已删除的账号
-        show_deleted = request.args.get('show_deleted', 'false').lower() == 'true'
+        show_deleted = request.args.get("show_deleted", "false").lower() == "true"
+
+        page = max(page, 1)
+        per_page = max(min(per_page, 200), 1)
 
         # 构建查询
         query = Account.query
@@ -391,33 +378,48 @@ def admin_get_accounts():
         if not show_deleted:
             query = query.filter_by(is_deleted=0)
 
+        if query_text:
+            query = query.filter(Account.email.contains(query_text))
+
+        if used in {"true", "1"}:
+            query = query.filter_by(is_used=1)
+        elif used in {"false", "0"}:
+            query = query.filter_by(is_used=0)
+
         # 计算总页数
         total_accounts = query.count()
         total_pages = (total_accounts + per_page - 1) // per_page
 
         # 获取当前页的账号数据，按照create_time倒序排列
-        accounts = query.order_by(Account.create_time.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        accounts = query.order_by(Account.create_time.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
 
-        return jsonify({
-            'status': 'success',
-            'page': page,
-            'per_page': per_page,
-            'total': total_accounts,
-            'total_pages': total_pages,
-            'accounts': [account.to_dict(include_password=include_password) for account in accounts.items]
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "page": page,
+                "per_page": per_page,
+                "total": total_accounts,
+                "total_pages": total_pages,
+                "accounts": [
+                    account.to_dict(include_password=include_password) for account in accounts.items
+                ],
+            }
+        )
 
     except Exception:
         logger.error(f"管理员获取所有账号失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': '获取账号列表失败，请稍后再试'}), 500
+        return jsonify({"status": "error", "message": "获取账号列表失败，请稍后再试"}), 500
+
 
 # 管理员获取所有用户
-@api_bp.route('/admin/users', methods=['GET'])
+@api_bp.route("/admin/users", methods=["GET"])
 @admin_required
 def admin_get_users():
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
 
         # 查询用户 倒序排列
         query = User.query.order_by(User.id.desc())
@@ -425,31 +427,31 @@ def admin_get_users():
 
         users = [user.to_dict() for user in pagination.items]
 
-        return jsonify({
-            'status': 'success',
-            'page': page,
-            'per_page': per_page,
-            'total': pagination.total,
-            'total_pages': pagination.pages,
-            'users': users
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "page": page,
+                "per_page": per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages,
+                "users": users,
+            }
+        )
 
     except Exception:
         logger.error(f"管理员获取所有用户失败: {traceback.format_exc()}")
-        return jsonify({'status': 'error', 'message': '获取用户列表失败，请稍后再试'}), 500
+        return jsonify({"status": "error", "message": "获取用户列表失败，请稍后再试"}), 500
+
 
 # 逻辑删除账号
-@api_bp.route('/account/<int:account_id>/delete', methods=['PUT'])
+@api_bp.route("/account/<int:account_id>/delete", methods=["PUT"])
 @token_required
 def delete_account(account_id):
     try:
         # 查找账号
         account = db.session.get(Account, account_id)
         if not account:
-            return jsonify({
-                'status': 'error',
-                'message': f'账号 ID {account_id} 不存在'
-            }), 404
+            return jsonify({"status": "error", "message": f"账号 ID {account_id} 不存在"}), 404
 
         # 检查用户权限
         user = request.current_user
@@ -459,15 +461,9 @@ def delete_account(account_id):
             if user.id == 1:  # 管理员可以处理无主账号
                 pass
             else:
-                return jsonify({
-                    'status': 'error',
-                    'message': '无权删除此账号'
-                }), 403
+                return jsonify({"status": "error", "message": "无权删除此账号"}), 403
         elif account.user_id != user.id and user.id != 1:
-            return jsonify({
-                'status': 'error',
-                'message': '无权删除此账号'
-            }), 403
+            return jsonify({"status": "error", "message": "无权删除此账号"}), 403
 
         # 更新删除状态
         account.is_deleted = 1
@@ -480,24 +476,18 @@ def delete_account(account_id):
         )
         db.session.commit()
 
-        return jsonify({
-            'status': 'success',
-            'message': '账号已删除',
-            'account': account.to_dict()
-        })
+        return jsonify({"status": "success", "message": "账号已删除", "account": account.to_dict()})
 
     except Exception:
         db.session.rollback()
         logger.error(f"删除账号失败: {traceback.format_exc()}")
-        return jsonify({
-            'status': 'error',
-            'message': '删除账号失败，请稍后再试'
-        }), 500
+        return jsonify({"status": "error", "message": "删除账号失败，请稍后再试"}), 500
+
 
 # 健康检查
-@api_bp.route('/health', methods=['GET'])
+@api_bp.route("/health", methods=["GET"])
 def health_check():
-    payload = {'status': 'ok', 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    payload = {"status": "ok", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
     # Readiness probe: check database connectivity only when requested.
     ready = request.args.get("ready", "false").lower() in {"1", "true", "yes"}
@@ -513,7 +503,8 @@ def health_check():
 
     return jsonify(payload), 200
 
-@api_bp.route('/user/<int:user_id>', methods=['PUT'])
+
+@api_bp.route("/user/<int:user_id>", methods=["PUT"])
 @token_required
 def update_user(user_id):
     try:
@@ -522,42 +513,35 @@ def update_user(user_id):
 
         # 检查权限
         if request.current_user.id != user_id and not request.current_user.is_admin:
-            logger.warning(f"权限不足 - 当前用户ID: {request.current_user.id}, 目标用户ID: {user_id}")
-            return jsonify({
-                'status': 'error',
-                'message': '无权修改其他用户信息'
-            }), 403
+            logger.warning(
+                f"权限不足 - 当前用户ID: {request.current_user.id}, 目标用户ID: {user_id}"
+            )
+            return jsonify({"status": "error", "message": "无权修改其他用户信息"}), 403
 
         # 获取请求数据
         data = request.json
         if not data:
             logger.warning("缺少更新数据")
-            return jsonify({
-                'status': 'error',
-                'message': '缺少更新数据'
-            }), 400
+            return jsonify({"status": "error", "message": "缺少更新数据"}), 400
 
         # 查找用户
         user = db.session.get(User, user_id)
         if not user:
             logger.warning(f"用户不存在 - 用户ID: {user_id}")
-            return jsonify({
-                'status': 'error',
-                'message': '用户不存在'
-            }), 404
+            return jsonify({"status": "error", "message": "用户不存在"}), 404
 
         # 更新用户信息
-        if 'domain' in data:
-            user.domain = data['domain']
-        if 'temp_email_address' in data:
-            if '@' in data['temp_email_address']:
-                user.temp_email_address = data['temp_email_address']
+        if "domain" in data:
+            user.domain = data["domain"]
+        if "temp_email_address" in data:
+            if "@" in data["temp_email_address"]:
+                user.temp_email_address = data["temp_email_address"]
             else:
-                raise ValueError('临时邮箱地址格式错误 正确格式：zoowayss@mailto.plus')
-        if 'email' in data:
-            user.email = data['email']
-        if 'password' in data:
-            user.password_hash = User.hash_password(data['password'])
+                raise ValueError("临时邮箱地址格式错误 正确格式：zoowayss@mailto.plus")
+        if "email" in data:
+            user.email = data["email"]
+        if "password" in data:
+            user.password_hash = User.hash_password(data["password"])
 
         record_audit(
             action="user.update",
@@ -568,11 +552,7 @@ def update_user(user_id):
         db.session.commit()
         logger.info(f"用户信息更新成功 - 用户ID: {user_id}")
 
-        return jsonify({
-            'status': 'success',
-            'message': '用户信息更新成功',
-            'user': user.to_dict()
-        })
+        return jsonify({"status": "success", "message": "用户信息更新成功", "user": user.to_dict()})
 
     except ValueError as e:
         db.session.rollback()
@@ -580,10 +560,7 @@ def update_user(user_id):
     except Exception:
         db.session.rollback()
         logger.error(f"更新用户信息失败: {traceback.format_exc()}")
-        return jsonify({
-            'status': 'error',
-            'message': '更新用户信息失败，请稍后再试'
-        }), 500
+        return jsonify({"status": "error", "message": "更新用户信息失败，请稍后再试"}), 500
 
 
 # 获取当前用户的审计日志

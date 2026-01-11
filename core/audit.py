@@ -34,11 +34,12 @@ def record_audit(
         entity_type=entity_type,
         entity_id=entity_id,
         request_id=request_id_var.get(),
-        ip=request.headers.get("X-Real-IP") or request.headers.get("X-Forwarded-For") or request.remote_addr,
+        ip=request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For")
+        or request.remote_addr,
         user_agent=request.headers.get("User-Agent"),
         detail=detail_json,
         created_at=int(time.time()),
     )
     db.session.add(log)
     return log
-

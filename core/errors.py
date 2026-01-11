@@ -18,7 +18,11 @@ def _json_error(
     code: Optional[str] = None,
     details: Optional[Any] = None,
 ):
-    payload: dict[str, Any] = {"status": "error", "message": message, "request_id": request_id_var.get()}
+    payload: dict[str, Any] = {
+        "status": "error",
+        "message": message,
+        "request_id": request_id_var.get(),
+    }
     if code:
         payload["code"] = code
     if details is not None:

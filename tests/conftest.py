@@ -27,4 +27,3 @@ def app(tmp_path, monkeypatch):
 @pytest.fixture()
 def client(app):
     return app.test_client()
-

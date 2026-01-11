@@ -217,6 +217,11 @@ main.container {
   outline: none;
 }
 
+.input--sm {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .input:focus {
   border-color: rgba(124, 58, 237, 0.55);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
@@ -230,6 +235,10 @@ main.container {
 
 .row--between {
   justify-content: space-between;
+}
+
+.row--wrap {
+  flex-wrap: wrap;
 }
 
 .btn {
@@ -348,4 +357,3 @@ main.container {
   background: rgba(239, 68, 68, 0.08);
   color: var(--text);
 }
-
