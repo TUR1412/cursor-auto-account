@@ -65,6 +65,9 @@ def register_request_context(app) -> None:
             duration_ms = None
 
         if duration_ms is not None:
+            response.headers.setdefault("Server-Timing", f"app;dur={duration_ms:.2f}")
+            response.headers.setdefault("X-Response-Time", f"{duration_ms:.2f}ms")
+
             logger.info(
                 "%s %s -> %s (%.2fms)",
                 request.method,

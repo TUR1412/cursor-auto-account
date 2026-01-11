@@ -191,7 +191,7 @@
         </div>
       </div>
 
-      <div class="tableWrap" role="region" aria-label="用户列表" tabindex="0">
+      <div class="tableWrap" role="region" aria-label="用户列表" tabindex="0">  
         <table class="table" id="usersTable">
           <thead>
             <tr>
@@ -200,6 +200,57 @@
               <th>Email</th>
               <th>Created</th>
               <th>Last login</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row row--between row--wrap">
+        <div class="row row--wrap">
+          <h3 class="h3">全局审计日志</h3>
+          <span class="muted" id="adminLogsMeta"></span>
+        </div>
+        <div class="row row--wrap">
+          <input
+            class="input input--sm"
+            id="adminLogsUserId"
+            type="number"
+            placeholder="筛选用户ID（可选）"
+            autocomplete="off"
+            aria-label="筛选用户ID"
+          />
+          <select class="input input--sm" id="adminLogsPerPage" aria-label="每页数量">
+            <option value="10">10/页</option>
+            <option value="20">20/页</option>
+            <option value="50">50/页</option>
+            <option value="100">100/页</option>
+          </select>
+          <button class="btn btn--ghost btn--sm" id="btnAdminLogsPrev" type="button">
+            上一页
+          </button>
+          <span class="muted" id="adminLogsPager"></span>
+          <button class="btn btn--ghost btn--sm" id="btnAdminLogsNext" type="button">
+            下一页
+          </button>
+          <button class="btn btn--ghost btn--sm" id="btnAdminLogsRefresh" type="button">
+            刷新
+          </button>
+        </div>
+      </div>
+
+      <div class="tableWrap" role="region" aria-label="全局审计日志" tabindex="0">
+        <table class="table" id="adminLogsTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Request</th>
+              <th>Detail</th>
             </tr>
           </thead>
           <tbody></tbody>

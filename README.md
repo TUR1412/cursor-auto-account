@@ -19,6 +19,7 @@
 - **账号池管理**：导入账号后可“发放”一个未使用账号（发放即自动标记为已用）
 - **可观测性**：
   - `X-Request-ID` 请求链路标识
+  - `Server-Timing` / `X-Response-Time` 响应耗时
   - Prometheus 指标 `GET /metrics`
   - 可选 JSON 日志（`LOG_FORMAT=json`）
 - **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`）
@@ -155,7 +156,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **JWT authentication** (Header/Cookie/Query supported)
 - **Account pool workflow**: import accounts, then “checkout” an unused one (checkout marks it as used)
 - **Listing UX**: `/api/accounts` supports `page` / `per_page` / `q` / `used` for pagination and filtering
-- **Observability**: `X-Request-ID`, Prometheus metrics at `GET /metrics`, optional JSON logs
+- **Observability**: `X-Request-ID`, `Server-Timing`/`X-Response-Time`, Prometheus metrics at `GET /metrics`, optional JSON logs
 - **Audit logs**: query at `GET /api/audit/logs`
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
 - **Optional rate limiting**: `RATE_LIMIT_ENABLED`

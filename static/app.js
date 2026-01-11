@@ -20,6 +20,12 @@ const usersState = {
   query: "",
 };
 
+const adminLogsState = {
+  page: 1,
+  perPage: 20,
+  userId: "",
+};
+
 function getToken() {
   return localStorage.getItem(storageKey) || "";
 }
@@ -273,6 +279,32 @@ function renderUsers(users) {
   }
 }
 
+function renderAdminLogs(logs) {
+  const tbody = $("adminLogsTable").querySelector("tbody");
+  tbody.innerHTML = "";
+
+  for (const log of logs) {
+    let detailText = "";
+    try {
+      detailText = log.detail ? JSON.stringify(JSON.parse(log.detail)) : "";
+    } catch {
+      detailText = log.detail || "";
+    }
+
+    const entity = log.entity_type ? `${log.entity_type}#${log.entity_id || ""}` : "";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${fmtTime(log.created_at)}</td>
+      <td>${escapeHtml(log.user_id ?? "")}</td>
+      <td><code>${escapeHtml(log.action)}</code></td>
+      <td>${escapeHtml(entity)}</td>
+      <td><code>${escapeHtml(log.request_id || "")}</code></td>
+      <td><code>${escapeHtml(detailText)}</code></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
 async function refreshAccounts() {
   const params = new URLSearchParams();
   params.set("page", String(accountsState.page));
@@ -343,6 +375,42 @@ async function refreshUsers() {
   renderUsers(users);
 }
 
+async function refreshAdminLogs() {
+  const params = new URLSearchParams();
+  params.set("page", String(adminLogsState.page));
+  params.set("per_page", String(adminLogsState.perPage));
+  const userId = String(adminLogsState.userId || "").trim();
+  if (userId) params.set("user_id", userId);
+
+  const data = await api(`/api/admin/audit/logs?${params.toString()}`);
+  const logs = data.logs || [];
+
+  // If the current page becomes empty (e.g. after deletions), step back one
+  // page and retry once.
+  if (logs.length === 0 && Number(data.page) > 1) {
+    adminLogsState.page = Number(data.page) - 1;
+    return refreshAdminLogs();
+  }
+
+  const total = Number(data.total ?? logs.length);
+  const page = Number(data.page ?? adminLogsState.page);
+  const totalPages = Number(data.total_pages ?? 1) || 1;
+
+  const meta = $("adminLogsMeta");
+  if (meta) meta.textContent = `共 ${total} 条 · 每页 ${adminLogsState.perPage} 条`;
+
+  const pager = $("adminLogsPager");
+  if (pager) pager.textContent = `第 ${page}/${totalPages} 页`;
+
+  const prev = $("btnAdminLogsPrev");
+  if (prev) prev.disabled = page <= 1;
+
+  const next = $("btnAdminLogsNext");
+  if (next) next.disabled = page >= totalPages;
+
+  renderAdminLogs(logs);
+}
+
 async function refreshLogs() {
   const data = await api("/api/audit/logs?per_page=10");
   renderLogs(data.logs || []);
@@ -352,6 +420,7 @@ async function bootstrap() {
   const isAppPage = Boolean($("loginForm") && $("appCard"));
   const perPageSelect = $("accountsPerPage");
   const usersPerPageSelect = $("usersPerPage");
+  const adminLogsPerPageSelect = $("adminLogsPerPage");
 
   // Global navbar actions (available on all pages)
   const btnLogout = $("btnLogout");
@@ -378,6 +447,10 @@ async function bootstrap() {
 
   if (isAppPage && usersPerPageSelect) {
     usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;
+  }
+
+  if (isAppPage && adminLogsPerPageSelect) {
+    adminLogsState.perPage = Number(adminLogsPerPageSelect.value || 20) || 20;
   }
 
   let queryTimer = null;
@@ -416,6 +489,24 @@ async function bootstrap() {
     });
   }
 
+  let adminLogsUserIdTimer = null;
+  const adminLogsUserIdInput = $("adminLogsUserId");
+  if (adminLogsUserIdInput) {
+    adminLogsUserIdInput.addEventListener("input", () => {
+      if (adminLogsUserIdTimer) window.clearTimeout(adminLogsUserIdTimer);
+      adminLogsUserIdTimer = window.setTimeout(async () => {
+        try {
+          hideNotice();
+          adminLogsState.userId = adminLogsUserIdInput.value.trim();
+          adminLogsState.page = 1;
+          await refreshAdminLogs();
+        } catch (err) {
+          showNotice(err.message || "搜索失败", "error");
+        }
+      }, 250);
+    });
+  }
+
   if (perPageSelect) {
     perPageSelect.addEventListener("change", async () => {
       try {
@@ -433,9 +524,22 @@ async function bootstrap() {
     usersPerPageSelect.addEventListener("change", async () => {
       try {
         hideNotice();
-        usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;
+        usersState.perPage = Number(usersPerPageSelect.value || 10) || 10;      
         usersState.page = 1;
         await refreshUsers();
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
+  if (adminLogsPerPageSelect) {
+    adminLogsPerPageSelect.addEventListener("change", async () => {
+      try {
+        hideNotice();
+        adminLogsState.perPage = Number(adminLogsPerPageSelect.value || 20) || 20;
+        adminLogsState.page = 1;
+        await refreshAdminLogs();
       } catch (err) {
         showNotice(err.message || "刷新失败", "error");
       }
@@ -468,6 +572,19 @@ async function bootstrap() {
     });
   }
 
+  const btnAdminLogsPrev = $("btnAdminLogsPrev");
+  if (btnAdminLogsPrev) {
+    btnAdminLogsPrev.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        adminLogsState.page = Math.max(1, adminLogsState.page - 1);
+        await refreshAdminLogs();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
   const btnNext = $("btnNextPage");
   if (btnNext) {
     btnNext.addEventListener("click", async () => {
@@ -494,6 +611,19 @@ async function bootstrap() {
     });
   }
 
+  const btnAdminLogsNext = $("btnAdminLogsNext");
+  if (btnAdminLogsNext) {
+    btnAdminLogsNext.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        adminLogsState.page += 1;
+        await refreshAdminLogs();
+      } catch (err) {
+        showNotice(err.message || "翻页失败", "error");
+      }
+    });
+  }
+
   const btnRefreshLogs = $("btnRefreshLogs");
   if (btnRefreshLogs) {
     btnRefreshLogs.addEventListener("click", async () => {
@@ -501,6 +631,19 @@ async function bootstrap() {
         hideNotice();
         await refreshLogs();
         showNotice("日志已刷新", "success");
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
+  const btnAdminLogsRefresh = $("btnAdminLogsRefresh");
+  if (btnAdminLogsRefresh) {
+    btnAdminLogsRefresh.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        await refreshAdminLogs();
+        showNotice("全局日志已刷新", "success");
       } catch (err) {
         showNotice(err.message || "刷新失败", "error");
       }
@@ -525,6 +668,7 @@ async function bootstrap() {
           usersState.page = 1;
           await refreshUsers();
           await refreshLogs();
+          await refreshAdminLogs();
           showNotice("用户已创建", "success");
         } catch (err) {
           showNotice(err.message || "创建失败", "error");
@@ -548,6 +692,7 @@ async function bootstrap() {
           $("adminResetPassword").value = "";
           await refreshUsers();
           await refreshLogs();
+          await refreshAdminLogs();
           showNotice("密码已重置", "success");
         } catch (err) {
           showNotice(err.message || "重置失败", "error");
@@ -573,6 +718,8 @@ async function bootstrap() {
         if (me.user && me.user.is_admin) {
           usersState.page = 1;
           await refreshUsers();
+          adminLogsState.page = 1;
+          await refreshAdminLogs();
         }
         showNotice("登录成功", "success");
       } catch (err) {
@@ -599,6 +746,8 @@ async function bootstrap() {
         if (me.user && me.user.is_admin) {
           usersState.page = 1;
           await refreshUsers();
+          adminLogsState.page = 1;
+          await refreshAdminLogs();
         }
         showNotice("注册成功", "success");
       } catch (err) {
@@ -666,6 +815,8 @@ async function bootstrap() {
       if (me.user && me.user.is_admin) {
         usersState.page = 1;
         await refreshUsers();
+        adminLogsState.page = 1;
+        await refreshAdminLogs();
       }
     }
   } catch {

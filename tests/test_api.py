@@ -127,6 +127,26 @@ def test_admin_can_reset_user_password(client):
     assert ok_new.status_code == 200
 
 
+def test_admin_audit_logs_can_filter_by_user_id(client):
+    admin_reg = _register(client, username="superadmin", password="p@ss", email="sa@example.com")
+    admin_token = admin_reg.json["token"]
+
+    bob_reg = _register(client, username="bob-audit", password="p", email="bob-audit@example.com")
+    bob_token = bob_reg.json["token"]
+    bob_me = client.get("/api/user", headers=_auth_headers(bob_token))
+    assert bob_me.status_code == 200
+    bob_id = bob_me.json["user"]["id"]
+
+    filtered = client.get(
+        f"/api/admin/audit/logs?user_id={bob_id}&per_page=50",
+        headers=_auth_headers(admin_token),
+    )
+    assert filtered.status_code == 200
+    assert filtered.json["status"] == "success"
+    assert filtered.json["logs"]
+    assert all(item["user_id"] == bob_id for item in filtered.json["logs"])
+
+
 def test_import_and_checkout_account_flow(client):
     reg = _register(client, username="bob", password="p@ss", email="bob@example.com")
     token = reg.json["token"]
