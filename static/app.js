@@ -12,6 +12,7 @@ const accountsState = {
   page: 1,
   perPage: 10,
   query: "",
+  used: "",
 };
 
 const logsState = {
@@ -317,6 +318,7 @@ async function refreshAccounts() {
   params.set("page", String(accountsState.page));
   params.set("per_page", String(accountsState.perPage));
   if (accountsState.query) params.set("q", accountsState.query);
+  if (accountsState.used) params.set("used", accountsState.used);
 
   const data = await api(`/api/accounts?${params.toString()}`);
   const accounts = data.accounts || [];
@@ -457,6 +459,7 @@ async function refreshLogs() {
 async function bootstrap() {
   const isAppPage = Boolean($("loginForm") && $("appCard"));
   const perPageSelect = $("accountsPerPage");
+  const usedSelect = $("accountsUsed");
   const logsPerPageSelect = $("logsPerPage");
   const usersPerPageSelect = $("usersPerPage");
   const adminLogsPerPageSelect = $("adminLogsPerPage");
@@ -482,6 +485,10 @@ async function bootstrap() {
 
   if (isAppPage && perPageSelect) {
     accountsState.perPage = Number(perPageSelect.value || 10) || 10;
+  }
+
+  if (isAppPage && usedSelect) {
+    accountsState.used = String(usedSelect.value || "").trim();
   }
 
   if (isAppPage && logsPerPageSelect) {
@@ -591,6 +598,19 @@ async function bootstrap() {
       try {
         hideNotice();
         accountsState.perPage = Number(perPageSelect.value || 10) || 10;        
+        accountsState.page = 1;
+        await refreshAccounts();
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
+
+  if (usedSelect) {
+    usedSelect.addEventListener("change", async () => {
+      try {
+        hideNotice();
+        accountsState.used = String(usedSelect.value || "").trim();
         accountsState.page = 1;
         await refreshAccounts();
       } catch (err) {
