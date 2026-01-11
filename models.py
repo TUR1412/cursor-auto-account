@@ -101,6 +101,18 @@ class Account(db.Model):
         return data
 
 
+class RevokedToken(db.Model):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    jti = Column(String(64), unique=True, nullable=False, index=True)
+    exp = Column(BigInteger, nullable=False, index=True)
+    revoked_at = Column(BigInteger, nullable=False, index=True)
+
+    user = relationship("User")
+
+
 class AuditLog(db.Model):
     __tablename__ = "audit_logs"
 

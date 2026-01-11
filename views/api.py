@@ -15,7 +15,7 @@ from auth import admin_required, generate_token, token_required
 from core.audit import record_audit
 from core.crypto import encrypt_secret
 from core.ratelimit import rate_limit
-from models import Account, AuditLog, User, db
+from models import Account, AuditLog, RevokedToken, User, db
 
 # 创建蓝图
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -139,8 +139,37 @@ def get_user_info():
 @api_bp.route("/logout", methods=["POST"])
 @token_required
 def logout():
-    # 无需数据库操作，客户端清除token即可
-    return jsonify({"status": "success", "message": "已成功退出登录"})
+    payload = getattr(request, "token_payload", {}) or {}
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    now = int(time.time())
+
+    if jti and exp:
+        try:
+            # Best-effort cleanup to prevent unbounded growth.
+            RevokedToken.query.filter(RevokedToken.exp < now).delete(synchronize_session=False)
+
+            db.session.add(
+                RevokedToken(
+                    user_id=request.current_user.id,
+                    jti=str(jti),
+                    exp=int(exp),
+                    revoked_at=now,
+                )
+            )
+            record_audit(action="user.logout", user=request.current_user)
+            db.session.commit()
+        except IntegrityError:
+            # Token already revoked; treat logout as idempotent.
+            db.session.rollback()
+        except Exception:
+            db.session.rollback()
+            logger.error(f"退出登录失败: {traceback.format_exc()}")
+            return jsonify({"status": "error", "message": "退出登录失败，请稍后再试"}), 500
+
+    resp = jsonify({"status": "success", "message": "已成功退出登录"})
+    resp.delete_cookie("token")
+    return resp
 
 
 # 获取一个可用账号 (已登录用户)

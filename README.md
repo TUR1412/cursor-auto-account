@@ -24,6 +24,7 @@
 - **审计日志**：记录关键操作并可查询（`GET /api/audit/logs`）
 - **质量保障**：内置 `pytest` 单元测试 + `ruff` 静态检查
 - **Web 控制台**：访问 `GET /app`（无框架、轻量、性能友好）
+- **安全增强**：`POST /api/logout` 会撤销当前 Token（基于 `jti` 黑名单）
 
 ### 快速开始（Docker Compose）
 
@@ -92,8 +93,8 @@ python -m pytest
 | `RATE_LIMIT_MAX_BUCKETS` | 限流内存桶上限（可选） | `5000` |
 | `ALLOW_SELF_REGISTER` | 是否允许用户自助注册（可选） | `true` |
 | `ALLOW_ADMIN_PASSWORD_EXPORT` | 是否允许管理员批量导出密码（强风险，默认关闭） | `false` |
-| `ADMIN_USERNAME` | 管理员用户名（用于创建默认管理员 + 管理员权限识别） | `admin` |
-| `ADMIN_PASSWORD` | 管理员密码（启动时会同步更新） | `admin` |
+| `ADMIN_USERNAME` | 管理员用户名（用于创建默认管理员；若显式设置，也用于管理员权限识别） | `admin` |
+| `ADMIN_PASSWORD` | 管理员密码（若显式设置，启动时会同步更新；未设置则不会覆盖已有密码） | `admin` |
 | `ADMIN_USER_IDS` | 管理员用户 ID 白名单（逗号分隔，可选） | `1,2` |
 
 ### API 速查
@@ -101,6 +102,7 @@ python -m pytest
 - `POST /api/register` 注册
 - `POST /api/login` 登录
 - `GET /api/user` 获取当前用户信息（需要 Token）
+- `POST /api/logout` 退出登录（撤销当前 Token）
 - `POST /api/account` 导入账号（需要 Token）
 - `GET /api/account` 发放一个未使用账号（需要 Token）
 - `GET /api/account/<id>` 获取单个账号详情（需要 Token）
@@ -135,6 +137,7 @@ It is intended to manage **accounts you already own legitimately** (import / lis
 - **Optional at-rest encryption**: `ACCOUNT_ENCRYPTION_KEY` (recommended for production)
 - **Optional rate limiting**: `RATE_LIMIT_ENABLED`
 - **Admin access control**: `ADMIN_USERNAME` / `ADMIN_USER_IDS`
+- **Logout revokes tokens**: `POST /api/logout` invalidates the current token (jti blacklist)
 - **Quality gates**: built-in `pytest` tests and `ruff` lint checks
 - **Web console**: `GET /app` (no framework, fast, Lighthouse-friendly)
 

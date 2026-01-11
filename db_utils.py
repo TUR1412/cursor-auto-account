@@ -41,11 +41,17 @@ def init_db(app):
             logging.info("数据库初始化成功")
 
             # 创建默认管理员账号
-            admin_username = os.getenv("ADMIN_USERNAME", "admin")
-            admin_password = os.getenv("ADMIN_PASSWORD", "admin")
+            admin_username = os.getenv("ADMIN_USERNAME") or "admin"
+            admin_password_env = os.getenv("ADMIN_PASSWORD")
+            admin_password = admin_password_env or "admin"
 
             admin = User.query.filter_by(username=admin_username).first()
             if not admin:
+                if admin_password_env is None:
+                    logging.warning(
+                        "未设置 ADMIN_PASSWORD，已使用默认密码创建管理员账号：%s（建议立即修改）",
+                        admin_username,
+                    )
                 admin = User(
                     username=admin_username,
                     password_hash=User.hash_password(admin_password),
@@ -55,10 +61,15 @@ def init_db(app):
                 db.session.commit()
                 logging.info(f"创建默认管理员账号: {admin_username}")
             else:
-                # update admin password
-                admin.password_hash = User.hash_password(admin_password)
-                db.session.commit()
-                logging.info(f"更新管理员密码: {admin_username}")
+                # Only update admin password when explicitly configured, to avoid accidental resets.
+                if admin_password_env is not None:
+                    admin.password_hash = User.hash_password(admin_password)
+                    db.session.commit()
+                    logging.info(f"更新管理员密码: {admin_username}")
+                else:
+                    logging.info(
+                        f"管理员账号已存在，未设置 ADMIN_PASSWORD，跳过密码更新: {admin_username}"
+                    )
 
         except Exception:
             db.session.rollback()

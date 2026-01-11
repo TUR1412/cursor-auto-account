@@ -105,17 +105,27 @@ async function api(path, options = {}) {
 }
 
 function setAuthedUI(user) {
-  $("authCard").hidden = true;
-  $("appCard").hidden = false;
-  $("btnLogout").hidden = false;
-  $("navUser").textContent = `已登录：${user.username}（ID ${user.id}）`;
+  const authCard = $("authCard");
+  const appCard = $("appCard");
+  const btnLogout = $("btnLogout");
+  const navUser = $("navUser");
+
+  if (authCard) authCard.hidden = true;
+  if (appCard) appCard.hidden = false;
+  if (btnLogout) btnLogout.hidden = false;
+  if (navUser) navUser.textContent = `已登录：${user.username}（ID ${user.id}）`;
 }
 
 function setGuestUI() {
-  $("authCard").hidden = false;
-  $("appCard").hidden = true;
-  $("btnLogout").hidden = true;
-  $("navUser").textContent = "未登录";
+  const authCard = $("authCard");
+  const appCard = $("appCard");
+  const btnLogout = $("btnLogout");
+  const navUser = $("navUser");
+
+  if (authCard) authCard.hidden = false;
+  if (appCard) appCard.hidden = true;
+  if (btnLogout) btnLogout.hidden = true;
+  if (navUser) navUser.textContent = "未登录";
 }
 
 function fmtExpire(account) {
@@ -259,14 +269,29 @@ async function refreshLogs() {
 }
 
 async function bootstrap() {
-  // This script is shared across pages via the base layout.
-  // Only run the console bootstrapping on the /app page.
-  if (!$("loginForm") || !$("appCard")) {
-    return;
+  const isAppPage = Boolean($("loginForm") && $("appCard"));
+  const perPageSelect = $("accountsPerPage");
+
+  // Global navbar actions (available on all pages)
+  const btnLogout = $("btnLogout");
+  if (btnLogout) {
+    btnLogout.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        if (getToken()) {
+          await api("/api/logout", { method: "POST" });
+        }
+      } catch {
+        // best-effort, still clear local token
+      } finally {
+        clearToken();
+        setGuestUI();
+        showNotice("已退出登录", "success");
+      }
+    });
   }
 
-  const perPageSelect = $("accountsPerPage");
-  if (perPageSelect) {
+  if (isAppPage && perPageSelect) {
     accountsState.perPage = Number(perPageSelect.value || 10) || 10;
   }
 
@@ -327,109 +352,108 @@ async function bootstrap() {
     });
   }
 
-  $("btnLogout").addEventListener("click", () => {
-    clearToken();
-    setGuestUI();
-    showNotice("已退出登录", "success");
-  });
+  const btnRefreshLogs = $("btnRefreshLogs");
+  if (btnRefreshLogs) {
+    btnRefreshLogs.addEventListener("click", async () => {
+      try {
+        hideNotice();
+        await refreshLogs();
+        showNotice("日志已刷新", "success");
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
 
-  $("btnRefreshLogs").addEventListener("click", async () => {
-    try {
-      hideNotice();
-      await refreshLogs();
-      showNotice("日志已刷新", "success");
-    } catch (err) {
-      showNotice(err.message || "刷新失败", "error");
-    }
-  });
+  if (isAppPage) {
+    $("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        hideNotice();
+        const username = $("loginUsername").value.trim();
+        const password = $("loginPassword").value;
+        const data = await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ username, password }),
+        });
+        setToken(data.token);
+        const me = await api("/api/user");
+        setAuthedUI(me.user);
+        await refreshAccounts();
+        await refreshLogs();
+        showNotice("登录成功", "success");
+      } catch (err) {
+        showNotice(err.message || "登录失败", "error");
+      }
+    });
 
-  $("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      hideNotice();
-      const username = $("loginUsername").value.trim();
-      const password = $("loginPassword").value;
-      const data = await api("/api/login", {
-        method: "POST",
-        body: JSON.stringify({ username, password }),
-      });
-      setToken(data.token);
-      const me = await api("/api/user");
-      setAuthedUI(me.user);
-      await refreshAccounts();
-      await refreshLogs();
-      showNotice("登录成功", "success");
-    } catch (err) {
-      showNotice(err.message || "登录失败", "error");
-    }
-  });
+    $("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        hideNotice();
+        const username = $("registerUsername").value.trim();
+        const email = $("registerEmail").value.trim();
+        const password = $("registerPassword").value;
+        const data = await api("/api/register", {
+          method: "POST",
+          body: JSON.stringify({ username, password, email: email || undefined }),
+        });
+        setToken(data.token);
+        const me = await api("/api/user");
+        setAuthedUI(me.user);
+        await refreshAccounts();
+        await refreshLogs();
+        showNotice("注册成功", "success");
+      } catch (err) {
+        showNotice(err.message || "注册失败", "error");
+      }
+    });
 
-  $("registerForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      hideNotice();
-      const username = $("registerUsername").value.trim();
-      const email = $("registerEmail").value.trim();
-      const password = $("registerPassword").value;
-      const data = await api("/api/register", {
-        method: "POST",
-        body: JSON.stringify({ username, password, email: email || undefined }),
-      });
-      setToken(data.token);
-      const me = await api("/api/user");
-      setAuthedUI(me.user);
-      await refreshAccounts();
-      await refreshLogs();
-      showNotice("注册成功", "success");
-    } catch (err) {
-      showNotice(err.message || "注册失败", "error");
-    }
-  });
+    $("importForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        hideNotice();
+        const email = $("importEmail").value.trim();
+        const password = $("importPassword").value;
+        await api("/api/account", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+        $("importPassword").value = "";
+        await refreshAccounts();
+        showNotice("账号已导入", "success");
+      } catch (err) {
+        showNotice(err.message || "导入失败", "error");
+      }
+    });
 
-  $("importForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      hideNotice();
-      const email = $("importEmail").value.trim();
-      const password = $("importPassword").value;
-      await api("/api/account", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      $("importPassword").value = "";
-      await refreshAccounts();
-      showNotice("账号已导入", "success");
-    } catch (err) {
-      showNotice(err.message || "导入失败", "error");
-    }
-  });
+    $("btnCheckout").addEventListener("click", async () => {
+      try {
+        hideNotice();
+        const data = await api("/api/account");
+        $("checkoutResult").textContent = JSON.stringify(data.account, null, 2);
+        await refreshAccounts();
+        await refreshLogs();
+        showNotice("账号已发放（已自动标记为已用）", "success");
+      } catch (err) {
+        $("checkoutResult").textContent = "";
+        showNotice(err.message || "获取失败", "error");
+      }
+    });
 
-  $("btnCheckout").addEventListener("click", async () => {
-    try {
-      hideNotice();
-      const data = await api("/api/account");
-      $("checkoutResult").textContent = JSON.stringify(data.account, null, 2);
-      await refreshAccounts();
-      await refreshLogs();
-      showNotice("账号已发放（已自动标记为已用）", "success");
-    } catch (err) {
-      $("checkoutResult").textContent = "";
-      showNotice(err.message || "获取失败", "error");
-    }
-  });
+    $("btnRefresh").addEventListener("click", async () => {
+      try {
+        hideNotice();
+        accountsState.page = 1;
+        await refreshAccounts();
+        showNotice("已刷新", "success");
+      } catch (err) {
+        showNotice(err.message || "刷新失败", "error");
+      }
+    });
+  }
 
-  $("btnRefresh").addEventListener("click", async () => {
-    try {
-      hideNotice();
-      accountsState.page = 1;
-      await refreshAccounts();
-      showNotice("已刷新", "success");
-    } catch (err) {
-      showNotice(err.message || "刷新失败", "error");
-    }
-  });
-
-  // Initial state
+  // Initial state (shared across pages)
   const token = getToken();
   if (!token) {
     setGuestUI();
@@ -439,8 +463,10 @@ async function bootstrap() {
   try {
     const me = await api("/api/user");
     setAuthedUI(me.user);
-    await refreshAccounts();
-    await refreshLogs();
+    if (isAppPage) {
+      await refreshAccounts();
+      await refreshLogs();
+    }
   } catch {
     clearToken();
     setGuestUI();

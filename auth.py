@@ -6,7 +6,7 @@ import jwt
 from flask import jsonify, request
 
 from core.admin import is_admin_user
-from models import User, db
+from models import RevokedToken, User, db
 
 # JWT密钥和过期时间将在app.py中设置
 SECRET_KEY = None
@@ -65,6 +65,12 @@ def token_required(f):
             if not user_id:
                 return jsonify({"status": "error", "message": "无效的令牌"}), 401
 
+            jti = payload.get("jti")
+            if jti:
+                revoked = RevokedToken.query.filter_by(jti=jti).first()
+                if revoked is not None:
+                    return jsonify({"status": "error", "message": "令牌已失效"}), 401
+
             current_user = db.session.get(User, user_id)
             if not current_user:
                 return jsonify({"status": "error", "message": "用户不存在"}), 401
@@ -78,6 +84,8 @@ def token_required(f):
 
         # 将用户添加到请求上下文
         request.current_user = current_user
+        request.token_payload = payload
+        request.auth_token = token
         return f(*args, **kwargs)
 
     return decorated

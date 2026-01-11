@@ -151,6 +151,7 @@ def build_openapi_spec() -> dict:
             "/api/logout": {
                 "post": {
                     "summary": "Logout",
+                    "description": "Revokes the current JWT token (jti blacklist) until it expires.",
                     "responses": {"200": {"description": "OK"}},
                 }
             },

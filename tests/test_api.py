@@ -41,6 +41,19 @@ def test_register_login_and_user_info(client):
     assert login.json["token"]
 
 
+def test_logout_revokes_token(client):
+    reg = _register(client, username="logout_user", password="p", email="l@example.com")
+    token = reg.json["token"]
+
+    ok = client.post("/api/logout", headers=_auth_headers(token))
+    assert ok.status_code == 200
+    assert ok.json["status"] == "success"
+
+    me = client.get("/api/user", headers=_auth_headers(token))
+    assert me.status_code == 401
+    assert me.json["status"] == "error"
+
+
 def test_import_and_checkout_account_flow(client):
     reg = _register(client, username="bob", password="p@ss", email="bob@example.com")
     token = reg.json["token"]
