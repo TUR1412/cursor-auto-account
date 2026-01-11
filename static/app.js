@@ -259,6 +259,12 @@ async function refreshLogs() {
 }
 
 async function bootstrap() {
+  // This script is shared across pages via the base layout.
+  // Only run the console bootstrapping on the /app page.
+  if (!$("loginForm") || !$("appCard")) {
+    return;
+  }
+
   const perPageSelect = $("accountsPerPage");
   if (perPageSelect) {
     accountsState.perPage = Number(perPageSelect.value || 10) || 10;

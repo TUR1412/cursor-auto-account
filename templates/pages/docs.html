@@ -1,0 +1,114 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}API 文档{% endblock %}
+
+{% block content %}
+  <section class="grid">
+    <div class="card">
+      <h1 class="h1">API 文档</h1>
+      <p class="muted">
+        这是一个轻量级账号管理服务的接口说明页。你也可以直接获取 OpenAPI：
+        <a href="/openapi.json"><code>/openapi.json</code></a>。
+      </p>
+      <div class="notice" id="notice" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="card__header">
+        <h2 class="h2">鉴权</h2>
+        <p class="muted">注册/登录后返回 JWT Token，后续请求在 Header 里携带。</p>
+      </div>
+      <pre class="code">Authorization: Bearer &lt;token&gt;</pre>
+    </div>
+
+    <div class="card">
+      <div class="card__header">
+        <h2 class="h2">常用接口</h2>
+        <p class="muted">以下为最常见的工作流：导入 → 列表 → 发放 → 标记/删除。</p>
+      </div>
+
+      <div class="tableWrap" role="region" aria-label="接口列表" tabindex="0">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Path</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="pill pill--ok">POST</span></td>
+              <td><code>/api/register</code></td>
+              <td>注册（可用 <code>ALLOW_SELF_REGISTER=false</code> 禁用）</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">POST</span></td>
+              <td><code>/api/login</code></td>
+              <td>登录</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">GET</span></td>
+              <td><code>/api/user</code></td>
+              <td>获取当前用户信息（需要 Token）</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">POST</span></td>
+              <td><code>/api/account</code></td>
+              <td>导入账号（需要 Token）</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">GET</span></td>
+              <td><code>/api/accounts</code></td>
+              <td>列表（支持 <code>page</code>/<code>per_page</code>/<code>q</code>/<code>used</code>）</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">GET</span></td>
+              <td><code>/api/account</code></td>
+              <td>发放一个未使用账号（发放即自动标记为已用）</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--ok">PUT</span></td>
+              <td><code>/api/account/&lt;id&gt;/status</code></td>
+              <td>标记已用/未用</td>
+            </tr>
+            <tr>
+              <td><span class="pill pill--warn">PUT</span></td>
+              <td><code>/api/account/&lt;id&gt;/delete</code></td>
+              <td>软删除</td>
+            </tr>
+            <tr>
+              <td><span class="pill">GET</span></td>
+              <td><code>/api/audit/logs</code></td>
+              <td>审计日志（需要 Token）</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__header">
+        <h2 class="h2">运维接口</h2>
+        <p class="muted">用于监控与健康检查。</p>
+      </div>
+      <pre class="code">GET /api/health
+GET /api/health?ready=1
+GET /metrics</pre>
+      <p class="muted">
+        如设置 <code>METRICS_TOKEN</code>，<code>/metrics</code> 需要携带 Token（Bearer / Header / Query）。
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card__header">
+        <h2 class="h2">合规说明（重要）</h2>
+        <p class="muted">
+          本项目不包含也不会执行任何第三方账号自动注册、验证码/风控绕过、批量注册等逻辑。
+          仅用于管理你已合法拥有的账号数据。
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+

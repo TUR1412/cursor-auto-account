@@ -128,6 +128,19 @@ def test_metrics_endpoint(client):
     assert "http_requests_total" in resp.get_data(as_text=True)
 
 
+def test_openapi_and_docs_routes(client):
+    spec = client.get("/openapi.json")
+    assert spec.status_code == 200
+    assert spec.is_json
+    assert spec.json["openapi"].startswith("3.")
+    assert "/api/login" in spec.json["paths"]
+
+    docs = client.get("/docs")
+    assert docs.status_code == 200
+    text = docs.get_data(as_text=True)
+    assert "/openapi.json" in text
+
+
 def test_account_password_encryption_at_rest(app, client, monkeypatch):
     from cryptography.fernet import Fernet
 

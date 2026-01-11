@@ -47,9 +47,11 @@ docker-compose up -d --build
 4. 访问
 
 - Web 控制台：`http://localhost:8001/app`
+- API 文档：`http://localhost:8001/docs`
+- OpenAPI：`http://localhost:8001/openapi.json`
 - 健康检查：`http://localhost:8001/api/health`
 - 监控指标：`http://localhost:8001/metrics`
-- 就绪探针（含DB检测）：`http://localhost:8001/api/health?ready=1`
+- 就绪探针（含DB检测）：`http://localhost:8001/api/health?ready=1`        
 
 ### 本地运行
 
@@ -109,6 +111,8 @@ python -m pytest
 - `GET /api/admin/audit/logs` 管理员审计日志（需要管理员 Token）
 - `GET /api/health` 健康检查
 - `GET /metrics` Prometheus 指标
+- `GET /docs` API 文档页
+- `GET /openapi.json` OpenAPI 规范
 
 ---
 
