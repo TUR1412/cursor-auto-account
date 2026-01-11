@@ -27,5 +27,8 @@ ENV DEBUG=false
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+# Container healthcheck (does not require curl/wget)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 CMD python -c "import urllib.request, sys; u=urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=2); sys.exit(0 if getattr(u,'status',200)==200 else 1)"
+
 # 启动服务
 CMD ["/start.sh"]
