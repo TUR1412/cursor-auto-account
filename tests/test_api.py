@@ -250,3 +250,31 @@ def test_admin_required_respects_admin_username_and_ids(tmp_path, monkeypatch):
     monkeypatch.setenv("ADMIN_USER_IDS", str(user_id))
     allowed = client.get("/api/admin/users", headers=_auth_headers(token))
     assert allowed.status_code == 200
+
+
+def test_update_user_admin_gate_respects_config(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch, ADMIN_USERNAME="root")
+
+    reg1 = _register(client, username="admin", password="p", email="u1@example.com")
+    token1 = reg1.json["token"]
+
+    reg2 = _register(client, username="bob", password="p", email="u2@example.com")
+    assert reg2.status_code == 200
+
+    me2 = client.get("/api/user", headers=_auth_headers(reg2.json["token"]))
+    user2_id = me2.json["user"]["id"]
+
+    blocked = client.put(
+        f"/api/user/{user2_id}",
+        headers=_auth_headers(token1),
+        json={"domain": "example.com"},
+    )
+    assert blocked.status_code == 403
+
+    monkeypatch.setenv("ADMIN_USER_IDS", "1")
+    allowed = client.put(
+        f"/api/user/{user2_id}",
+        headers=_auth_headers(token1),
+        json={"domain": "example.com"},
+    )
+    assert allowed.status_code == 200

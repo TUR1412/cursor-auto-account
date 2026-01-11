@@ -5,6 +5,7 @@ from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from core.admin import is_admin_user
 from core.crypto import decrypt_secret
 
 db = SQLAlchemy()
@@ -56,8 +57,7 @@ class User(db.Model):
 
     @property
     def is_admin(self) -> bool:
-        # 兼容项目当前实现：简单地以ID=1作为管理员
-        return self.id == 1
+        return is_admin_user(self)
 
 
 # 定义账号模型

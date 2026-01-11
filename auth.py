@@ -1,4 +1,3 @@
-import os
 import time
 import uuid
 from functools import wraps
@@ -6,6 +5,7 @@ from functools import wraps
 import jwt
 from flask import jsonify, request
 
+from core.admin import is_admin_user
 from models import User, db
 
 # JWT密钥和过期时间将在app.py中设置
@@ -93,32 +93,7 @@ def admin_required(f):
         if result is not None:
             return result
 
-        admin_username_env = os.getenv("ADMIN_USERNAME")
-        admin_username = (admin_username_env or "").strip() or "admin"
-        admin_user_ids_raw = (os.getenv("ADMIN_USER_IDS") or "").strip()
-        admin_user_ids = set()
-        if admin_user_ids_raw:
-            for part in admin_user_ids_raw.split(","):
-                part = part.strip()
-                if not part:
-                    continue
-                try:
-                    admin_user_ids.add(int(part))
-                except ValueError:
-                    continue
-
-        has_explicit_admin_config = admin_username_env is not None or bool(admin_user_ids_raw)
-
-        is_admin = False
-        if request.current_user.username == admin_username:
-            is_admin = True
-        elif request.current_user.id in admin_user_ids:
-            is_admin = True
-        elif not has_explicit_admin_config and request.current_user.id == 1:
-            # Backwards-compatible fallback (legacy behavior).
-            is_admin = True
-
-        if not is_admin:
+        if not is_admin_user(request.current_user):
             return jsonify({"status": "error", "message": "需要管理员权限"}), 403
 
         return f(*args, **kwargs)
